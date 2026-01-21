@@ -1,7 +1,4 @@
-import sqlalchemy as sq
-import sqlalchemy.orm as sqo
-import enum
-from datetime import datetime 
+from sqlalchemy.orm import DeclarativeBase
 
-class Base(sqo.DeclarativeBase):
+class Base(DeclarativeBase):
     pass

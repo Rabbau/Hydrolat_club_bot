@@ -1,5 +1,9 @@
-aiogram==3.3.0
-SQLAlchemy==2.0.20
+aiogram
+sqlalchemy
 asyncpg
-alembic
 python-dotenv
+alembic
+fastapi
+uvicorn[standard]
+pydantic
+aiohttp
