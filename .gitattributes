@@ -1,0 +1,30 @@
+# Установите поведение по умолчанию для всех файлов
+* text=auto
+
+# Укажите, что следующие файлы должны сохранять LF окончания
+*.py text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.ini text eol=lf
+*.cfg text eol=lf
+*.conf text eol=lf
+*.sh text eol=lf
+
+# Файлы, которые должны быть бинарными (не менять окончания строк)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.mov binary
+*.mp4 binary
+
+# Специфичные файлы вашего проекта
+.env text eol=lf
+.env.example text eol=lf
+requirements.txt text eol=lf
+migrations/**/*.py text eol=lf
+src/**/*.py text eol=lf

@@ -3,7 +3,5 @@ sqlalchemy
 asyncpg
 python-dotenv
 alembic
-fastapi
-uvicorn[standard]
 pydantic
-aiohttp
+pydantic-settings
