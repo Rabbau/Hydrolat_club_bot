@@ -1,6 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
+from datetime import datetime, timedelta
 from .database import async_session_maker
 from .models import User, UserStatus, Questionnaire, QuestionnaireStatus, Question, Answer
 
@@ -136,3 +137,92 @@ async def save_questionnaire(
         print(f"❌ Ошибка при сохранении анкеты: {e}")
         # В случае ошибки откатываем изменения
         return False, f"Ошибка при сохранении: {str(e)}"
+    
+async def get_statistics() -> dict:
+    """Получить статистику для админки."""
+    async with async_session_maker() as session:
+        # Общая статистика пользователей
+        total_users = await session.scalar(select(func.count(User.id)))
+        
+        # Статистика по статусам пользователей
+        user_status_stats = {}
+        for status in UserStatus:
+            count = await session.scalar(
+                select(func.count(User.id)).where(User.status == status)
+            )
+            user_status_stats[status.value] = count
+        
+        # Статистика анкет
+        total_questionnaires = await session.scalar(select(func.count(Questionnaire.id)))
+        
+        # Статистика по статусам анкет
+        questionnaire_status_stats = {}
+        for status in QuestionnaireStatus:
+            count = await session.scalar(
+                select(func.count(Questionnaire.id)).where(Questionnaire.status == status)
+            )
+            questionnaire_status_stats[status.value] = count
+        
+        # За сегодня
+        today = datetime.now().date()
+        users_today = await session.scalar(
+            select(func.count(User.id)).where(func.date(User.created_at) == today)
+        )
+        
+        questionnaires_today = await session.scalar(
+            select(func.count(Questionnaire.id)).where(func.date(Questionnaire.created_at) == today)
+        )
+        
+        return {
+            "total_users": total_users,
+            "new_users": user_status_stats.get("new", 0),
+            "questionnaire_completed": user_status_stats.get("questionnaire_completed", 0),
+            "member_users": user_status_stats.get("member", 0),
+            
+            "total_questionnaires": total_questionnaires,
+            "pending_count": questionnaire_status_stats.get("pending", 0),
+            "approved_count": questionnaire_status_stats.get("approved", 0),
+            "rejected_count": questionnaire_status_stats.get("rejected", 0),
+            
+            "users_today": users_today,
+            "questionnaires_today": questionnaires_today,
+        }
+
+
+async def get_pending_questionnaires_count() -> int:
+    """Получить количество анкет на модерации."""
+    async with async_session_maker() as session:
+        count = await session.scalar(
+            select(func.count(Questionnaire.id)).where(
+                Questionnaire.status == QuestionnaireStatus.pending
+            )
+        )
+        return count or 0
+
+
+async def get_pending_questionnaires_list(limit: int = 10, offset: int = 0):
+    """Получить список анкет на модерации."""
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(Questionnaire)
+            .where(Questionnaire.status == QuestionnaireStatus.pending)
+            .options(selectinload(Questionnaire.user))
+            .order_by(Questionnaire.created_at)
+            .limit(limit)
+            .offset(offset)
+        )
+        return result.scalars().all()
+
+
+async def get_questionnaire_details(questionnaire_id: int):
+    """Получить детали анкеты с ответами."""
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(Questionnaire)
+            .where(Questionnaire.id == questionnaire_id)
+            .options(
+                selectinload(Questionnaire.user),
+                selectinload(Questionnaire.answers).selectinload(Answer.question)
+            )
+        )
+        return result.scalar_one_or_none()
