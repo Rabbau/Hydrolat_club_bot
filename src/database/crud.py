@@ -4,6 +4,8 @@ from sqlalchemy.orm import selectinload
 from datetime import datetime, timedelta
 from .database import async_session_maker
 from .models import User, UserStatus, Questionnaire, QuestionnaireStatus, Question, Answer
+from sqlalchemy import desc 
+
 
 async def get_or_create_user(
     session: AsyncSession,
@@ -226,3 +228,148 @@ async def get_questionnaire_details(questionnaire_id: int):
             )
         )
         return result.scalar_one_or_none()
+
+async def approve_questionnaire(questionnaire_id: int) -> tuple[bool, User | None]:
+    """Одобрить анкету и изменить статус пользователя."""
+    async with async_session_maker() as session:
+        try:
+            # Получаем анкету с пользователем
+            result = await session.execute(
+                select(Questionnaire)
+                .where(Questionnaire.id == questionnaire_id)
+                .options(selectinload(Questionnaire.user))
+            )
+            questionnaire = result.scalar_one_or_none()
+            
+            if not questionnaire:
+                return False, None
+            
+            # Обновляем статус анкеты
+            questionnaire.status = QuestionnaireStatus.approved
+            
+            # Обновляем статус пользователя
+            questionnaire.user.status = UserStatus.approved
+            
+            await session.commit()
+            return True, questionnaire.user
+            
+        except Exception as e:
+            await session.rollback()
+            print(f"Ошибка при одобрении анкеты: {e}")
+            return False, None
+
+
+async def reject_questionnaire(questionnaire_id: int) -> tuple[bool, User | None]:
+    """Отклонить анкету и изменить статус пользователя."""
+    async with async_session_maker() as session:
+        try:
+            # Получаем анкету с пользователем
+            result = await session.execute(
+                select(Questionnaire)
+                .where(Questionnaire.id == questionnaire_id)
+                .options(selectinload(Questionnaire.user))
+            )
+            questionnaire = result.scalar_one_or_none()
+            
+            if not questionnaire:
+                return False, None
+            
+            # Обновляем статус анкеты
+            questionnaire.status = QuestionnaireStatus.rejected
+            
+            # Обновляем статус пользователя
+            questionnaire.user.status = UserStatus.rejected
+            
+            await session.commit()
+            return True, questionnaire.user
+            
+        except Exception as e:
+            await session.rollback()
+            print(f"Ошибка при отклонении анкеты: {e}")
+            return False, None
+
+async def approve_questionnaire(questionnaire_id: int) -> tuple[bool, User | None]:
+    """Одобрить анкету и изменить статус пользователя."""
+    async with async_session_maker() as session:
+        try:
+            # Получаем анкету с пользователем
+            result = await session.execute(
+                select(Questionnaire)
+                .where(Questionnaire.id == questionnaire_id)
+                .options(selectinload(Questionnaire.user))
+            )
+            questionnaire = result.scalar_one_or_none()
+            
+            if not questionnaire:
+                return False, None
+            
+            # Обновляем статус анкеты
+            questionnaire.status = QuestionnaireStatus.approved
+            
+            # Обновляем статус пользователя
+            questionnaire.user.status = UserStatus.approved
+            
+            await session.commit()
+            return True, questionnaire.user
+            
+        except Exception as e:
+            await session.rollback()
+            print(f"Ошибка при одобрении анкеты: {e}")
+            return False, None
+
+
+async def reject_questionnaire(questionnaire_id: int) -> tuple[bool, User | None]:
+    """Отклонить анкету и изменить статус пользователя."""
+    async with async_session_maker() as session:
+        try:
+            # Получаем анкету с пользователем
+            result = await session.execute(
+                select(Questionnaire)
+                .where(Questionnaire.id == questionnaire_id)
+                .options(selectinload(Questionnaire.user))
+            )
+            questionnaire = result.scalar_one_or_none()
+            
+            if not questionnaire:
+                return False, None
+            
+            # Обновляем статус анкеты
+            questionnaire.status = QuestionnaireStatus.rejected
+            
+            # Обновляем статус пользователя
+            questionnaire.user.status = UserStatus.rejected
+            
+            await session.commit()
+            return True, questionnaire.user
+            
+        except Exception as e:
+            await session.rollback()
+            print(f"Ошибка при отклонении анкеты: {e}")
+            return False, None
+        
+async def get_approved_questionnaires(limit: int = 10) -> list:
+    """Получить одобренные анкеты."""
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(Questionnaire)
+            .join(User)
+            .where(Questionnaire.status == QuestionnaireStatus.approved)
+            .order_by(desc(Questionnaire.created_at))  # Здесь используется desc
+            .limit(limit)
+            .options(selectinload(Questionnaire.user))
+        )
+        return result.scalars().all()
+
+
+async def get_rejected_questionnaires(limit: int = 10) -> list:
+    """Получить отклоненные анкеты."""
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(Questionnaire)
+            .join(User)
+            .where(Questionnaire.status == QuestionnaireStatus.rejected)
+            .order_by(desc(Questionnaire.created_at))  # Здесь используется desc
+            .limit(limit)
+            .options(selectinload(Questionnaire.user))
+        )
+        return result.scalars().all()
