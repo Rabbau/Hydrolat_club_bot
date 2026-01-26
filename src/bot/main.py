@@ -8,6 +8,8 @@ from src.bot.loader import bot
 from src.bot.handlers.start import router as start_router
 from src.bot.handlers.questionnaire.handlers import router as questionnaire_router
 from src.bot.handlers.admin import router as admin_router
+from src.bot.handlers.admin_management import router as admin_management_router
+from src.database.crud import initialize_superadmin_from_env
 
 # Настройка логирования
 logging.basicConfig(
@@ -21,11 +23,13 @@ async def main() -> None:
     """Основная функция запуска бота."""
     dp = Dispatcher(storage=MemoryStorage())
 
+    await initialize_superadmin_from_env()
     # Подключаем роутеры
     dp.include_router(start_router)
     dp.include_router(questionnaire_router)
     dp.include_router(admin_router)
-    
+    dp.include_router(admin_management_router)
+
     logger.info("✅ Бот запущен")
     logger.info(f"🤖 Имя бота: @{(await bot.get_me()).username}")
 

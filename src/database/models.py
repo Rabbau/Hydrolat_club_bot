@@ -120,3 +120,27 @@ class Subscription(Base):
 
     user = relationship("User", back_populates="subscriptions")
     tariff = relationship("Tariff", back_populates="subscriptions")
+
+# В конце файла models.py, после класса Subscription
+
+class Admin(Base):
+    __tablename__ = "admins"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
+    username: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    fullname: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    level: Mapped[int] = mapped_column(Integer, default=1)  # 1 - обычный админ, 2 - суперадмин
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    
+    # Связь с User (опционально)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), 
+        nullable=True
+    )
+    user: Mapped[User | None] = relationship("User")
+    
+    def __repr__(self):
+        return f"<Admin {self.telegram_id} (level {self.level})>"

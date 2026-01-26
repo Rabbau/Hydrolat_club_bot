@@ -29,25 +29,9 @@ router.message.filter(IsAdmin())
 router.callback_query.filter(IsAdmin())
 
 
-@router.message(Command("admin"))
-async def admin_panel(message: Message):
-    """Главная панель администратора."""
-    
-    # Получаем статистику для отображения
+async def get_admin_main_menu() -> tuple[str, InlineKeyboardBuilder]:
+    """Получить текст и клавиатуру главного меню админ-панели."""
     stats = await get_statistics()
-    
-    # Создаем клавиатуру
-    builder = InlineKeyboardBuilder()
-    
-    builder.button(text="📊 Статистика", callback_data="admin_stats")
-    builder.button(text="📝 Новые анкеты", callback_data="admin_new")
-    builder.button(text="✅ Одобренные", callback_data="admin_approved")
-    builder.button(text="❌ Отклоненные", callback_data="admin_rejected")
-    builder.button(text="👥 Пользователи", callback_data="admin_users")
-    builder.button(text="⚙️ Настройки", callback_data="admin_settings")
-    
-    # Располагаем кнопки по 2 в ряд
-    builder.adjust(2, 2, 2)
     
     text = f"""
 👑 Панель администратора
@@ -61,6 +45,22 @@ async def admin_panel(message: Message):
 Выберите раздел для управления:
     """
     
+    builder = InlineKeyboardBuilder()
+    builder.button(text="📊 Статистика", callback_data="admin_stats")
+    builder.button(text="📝 Новые анкеты", callback_data="admin_new")
+    builder.button(text="✅ Одобренные", callback_data="admin_approved")
+    builder.button(text="❌ Отклоненные", callback_data="admin_rejected")
+    builder.button(text="👥 Пользователи", callback_data="admin_users")
+    builder.button(text="⚙️ Настройки", callback_data="admin_settings")
+    builder.adjust(2, 2, 2)
+    
+    return text, builder
+
+
+@router.message(Command("admin"))
+async def admin_panel(message: Message):
+    """Главная панель администратора."""
+    text, builder = await get_admin_main_menu()
     await message.answer(text, reply_markup=builder.as_markup())
 
 
@@ -191,7 +191,7 @@ async def view_questionnaire_details(callback: CallbackQuery):
                 await callback.message.edit_text(
                     "❌ Анкета не найдена",
                     reply_markup=InlineKeyboardBuilder()
-                        .button(text="◀️ Назад", callback_data="admin_back")
+                        .button(text="◀️ Назад", callback_data="admin_new")
                         .as_markup()
                 )
             except Exception as edit_error:
@@ -278,7 +278,7 @@ async def view_questionnaire_details(callback: CallbackQuery):
                 reply_markup=InlineKeyboardBuilder()
                     .button(text="◀️ Назад", callback_data="admin_back")
                     .as_markup()
-            )
+        )
         except:
             pass
     
@@ -326,8 +326,9 @@ async def approve_questionnaire_handler(callback: CallbackQuery):
     
     builder = InlineKeyboardBuilder()
     builder.button(text="📝 Ещё анкеты", callback_data="admin_new")
-    builder.button(text="📊 Статистика", callback_data="admin_stats")
-    builder.adjust(2)
+    builder.button(text="✅ Одобренные", callback_data="admin_approved")
+    builder.button(text="📋 Назад", callback_data="admin_back")
+    builder.adjust(2, 1)
     
     try:
         await callback.message.edit_text(
@@ -383,8 +384,9 @@ async def reject_questionnaire_handler(callback: CallbackQuery):
     
     builder = InlineKeyboardBuilder()
     builder.button(text="📝 Ещё анкеты", callback_data="admin_new")
-    builder.button(text="📊 Статистика", callback_data="admin_stats")
-    builder.adjust(2)
+    builder.button(text="❌ Отклоненные", callback_data="admin_rejected")
+    builder.button(text="📋 Назад", callback_data="admin_back")
+    builder.adjust(2, 1)
     
     try:
         await callback.message.edit_text(
@@ -402,11 +404,15 @@ async def reject_questionnaire_handler(callback: CallbackQuery):
 @router.callback_query(F.data == "admin_back")
 async def admin_back(callback: CallbackQuery):
     """Вернуться в главное меню админки."""
-    if hasattr(callback, 'message') and callback.message:
-        try:
+    try:
+        text, builder = await get_admin_main_menu()
+        await callback.message.edit_text(text, reply_markup=builder.as_markup())
+    except Exception as e:
+        print(f"Ошибка в admin_back: {e}")
+        # Если не удалось отредактировать, отправляем новое сообщение
+        if hasattr(callback, 'message') and callback.message:
             await admin_panel(callback.message)
-        except Exception as e:
-            print(f"Ошибка в admin_back: {e}")
+    
     await callback.answer()
 
 
@@ -457,7 +463,7 @@ async def show_approved_questionnaires(callback: CallbackQuery):
         builder.button(text="📝 Новые", callback_data="admin_new")
         builder.button(text="❌ Отклоненные", callback_data="admin_rejected")
         builder.button(text="◀️ Назад", callback_data="admin_back")
-        builder.adjust(1, 2, 1, 1)  # Анкеты по одной, затем 2 кнопки, затем 1, затем 1
+        builder.adjust(1, 2, 1, 1)
         
         text = f"✅ Одобренные анкеты ({len(questionnaires)}):"
         
@@ -529,7 +535,7 @@ async def show_rejected_questionnaires(callback: CallbackQuery):
         builder.button(text="📝 Новые", callback_data="admin_new")
         builder.button(text="✅ Одобренные", callback_data="admin_approved")
         builder.button(text="◀️ Назад", callback_data="admin_back")
-        builder.adjust(1, 2, 1, 1)  # Анкеты по одной, затем 2 кнопки, затем 1, затем 1
+        builder.adjust(1, 2, 1, 1)
         
         text = f"❌ Отклоненные анкеты ({len(questionnaires)}):"
         
@@ -553,6 +559,7 @@ async def show_rejected_questionnaires(callback: CallbackQuery):
     
     await callback.answer()
 
+
 @router.callback_query(F.data.in_([
     "admin_users", "admin_settings"
 ]))
@@ -571,4 +578,12 @@ async def admin_coming_soon(callback: CallbackQuery):
         if "message is not modified" not in str(edit_error):
             raise edit_error
     
+    await callback.answer()
+
+@router.callback_query(F.data == "admin_panel")
+async def admin_panel_callback(callback: CallbackQuery):
+    """Обработчик inline-кнопки 'Админ панель'."""
+    print(f"DEBUG: Получен callback admin_panel от пользователя {callback.from_user.id}")
+    text, builder = await get_admin_main_menu()
+    await callback.message.answer(text, reply_markup=builder.as_markup())
     await callback.answer()

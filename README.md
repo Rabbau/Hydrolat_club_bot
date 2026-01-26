@@ -9,7 +9,7 @@ Telegram бот: `@hydrol_cl_bot`
 ```env
 BOT_TOKEN=...
 DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/dbname
-ADMIN_IDS=...
+SUPERADMIN_ID=your_tg_id
 ```
 
 2) Установите зависимости:
@@ -24,7 +24,7 @@ pip install -r requirements.txt
 python -m src.bot.main
 ```
 
-Примечание: если проект лежит в пути с кириллицей (например, `C:\Users\Aлек\...`) и у вас возникают ошибки PowerShell при `cd`, запускайте команды из `cmd.exe` или Windows Terminal (Command Prompt).
+Примечание: если проект лежит в пути с кириллицей (например, `C:\Users\Алек\...`) и у вас возникают ошибки PowerShell при `cd`, запускайте команды из `cmd.exe` или Windows Terminal (Command Prompt).
 
 ## Миграции (Alembic)
 
