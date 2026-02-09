@@ -1,14 +1,32 @@
-# Dockerfile   (лежит в той же папке, где compose файл, или в ./bot, смотря где build указан)
-
-FROM python:3.12-slim
+FROM python:3.12-slim-bookworm
 
 WORKDIR /app
 
-# Устанавливаем зависимости — этот слой кэшируется
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-# НЕ копируем весь код — он будет монтироваться через volume
-# Если хочешь, можно добавить только важные файлы, но для dev лучше volume
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    libpq-dev \
+    postgresql-client \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Копируем requirements.txt
+COPY requirements.txt .
+
+# Устанавливаем Python зависимости
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Копируем код
+COPY . .
+
+# Инициализируем Alembic (если нужно)
+# RUN python init_alembic.py  
 
 CMD ["python", "main.py"]

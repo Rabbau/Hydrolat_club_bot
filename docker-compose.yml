@@ -1,9 +1,49 @@
+# docker-compose.yml
 services:
-  telegram-bot:
-    build: ./bot                  # ← папка, где Dockerfile и код
-    container_name: telegram-bot
+  postgres:
+    image: postgres:15-alpine
+    container_name: tg_bot_postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME:-tg_bot_db}
+      POSTGRES_USER: ${DB_USER:-tg_bot_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-tg_bot_password}
     volumes:
-      - ./bot:/app                # ← монтируем именно папку с кодом
-    env_file:
-      - bot/.env
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-tg_bot_user} -d ${DB_NAME:-tg_bot_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
+
+  telegram-bot:
+    build: ./bot
+    container_name: telegram-bot
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./bot:/app
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-tg_bot_user}:${DB_PASSWORD:-tg_bot_password}@postgres:5432/${DB_NAME:-tg_bot_db}
+      BOT_TOKEN: ${BOT_TOKEN}
+      ADMIN_ID: ${ADMIN_ID}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-tg_bot_db}
+      DB_USER: ${DB_USER:-tg_bot_user}
+      DB_PASSWORD: ${DB_PASSWORD:-tg_bot_password}
+      DB_ECHO: ${DB_ECHO:-false}
+    env_file:
+      - .env
+    restart: on-failure
+    command: >
+      sh -c "
+        alembic upgrade head &&
+        python main.py
+      "
+
+volumes:
+  postgres_data:
