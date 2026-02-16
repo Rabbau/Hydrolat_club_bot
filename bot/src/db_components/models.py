@@ -86,6 +86,25 @@ class SurveySubmission(Base):
     reviewer_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     reviewer_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     personal_discount: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    promo_code_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("promo_codes.id"), nullable=True
+    )
+    promo_discount: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class SurveyQuestion(Base):
+    __tablename__ = "survey_questions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    position: Mapped[int] = mapped_column(Integer, nullable=False, unique=True)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    question_type: Mapped[str] = mapped_column(String(50), nullable=False, server_default="text")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -200,9 +219,14 @@ class AdminUser(Base):
 
 class BotMessageType(StrEnum):
     WELCOME = "welcome"
+    SURVEY_SUBMITTED = "survey_submitted"
     PAYMENT_DETAILS = "payment_details"
     PAYMENT_CONFIRMED = "payment_confirmed"
     SURVEY_REJECTED = "survey_rejected"
+    STATUS_EMPTY = "status_empty"
+    PROMO_APPLIED = "promo_applied"
+    PROMO_INVALID = "promo_invalid"
+    TARIFFS_HEADER = "tariffs_header"
 
 
 class BotMessage(Base):

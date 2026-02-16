@@ -1,56 +1,93 @@
-from aiogram import Router, F
-from aiogram.filters import CommandStart
+import logging
+
+from aiogram import F, Router
+from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import CallbackQuery, Message
 
 from src.FormManager.FormManager import FormManager
-from src.user_components.user_callbacks import UserCallback, UserAction
+from src.db_components.models import BotMessageType, SurveyStatusEnum
+from src.db_components.survey_manager import (
+    bot_message_manager,
+    payment_manager,
+    survey_manager,
+)
+from src.db_components.user_manager import UserManager
+from src.user_components.user_callbacks import UserAction, UserCallback
 from src.user_components.user_keyboard import (
-    user_main_menu_inline_keyboard as user_main_kb,
     user_filling_survey_inline_keyboard as yes_no_kb,
+    user_main_menu_inline_keyboard as user_main_kb,
     user_survey_check_status as status_kb,
 )
 from src.user_components.user_states import UserFSM
-from src.db_components.user_manager import UserManager
-from src.db_components.survey_manager import (
-    survey_manager,
-    payment_manager,
-    bot_message_manager,
-)
-from src.db_components.models import SurveyStatusEnum, BotMessageType
-
-import logging
 
 logger = logging.getLogger(__name__)
-
 user_router = Router(name="user_router")
+
+
+async def _get_message_text(message_type: BotMessageType, fallback: str) -> str:
+    message = await bot_message_manager.get_message(message_type)
+    return message.content if message else fallback
+
+
+async def _start_survey_flow(
+    user_id: int,
+    username: str | None,
+    first_name: str | None,
+    last_name: str | None,
+    state: FSMContext,
+    form: FormManager,
+    users: UserManager,
+) -> tuple[bool, str, str, str | None]:
+    questions_count = await form.get_questions_count()
+    if questions_count < 1:
+        return False, "Анкета пока не настроена", "", None
+
+    await users.add_user(
+        user_id=user_id,
+        username=username,
+        first_name=first_name,
+        last_name=last_name,
+    )
+    await users.clear_answers(user_id)
+
+    current_index = 1
+    question = await form.get_question_by_id(current_index)
+    if not question:
+        return False, "Ошибка загрузки анкеты", "", None
+
+    await state.set_state(UserFSM.filling_survey)
+    await state.update_data(total_questions=questions_count, question_id=current_index)
+    text = f"Вопрос {current_index}/{questions_count}:\n{question['text']}"
+    kb = yes_no_kb if question["type"] == "yes_no" else None
+    return True, "", text, kb
 
 
 @user_router.message(CommandStart())
 async def start(message: Message, users: UserManager):
-    """
-    Приветственное сообщение + предложение заполнить анкету
-    или посмотреть статус, если анкета уже есть.
-    """
     user_id = message.from_user.id
-
-    # Пробуем взять кастомное приветствие из БД
-    welcome_msg = await bot_message_manager.get_message(BotMessageType.WELCOME)
-    welcome_text = (
-        welcome_msg.content
-        if welcome_msg
-        else "Здравствуйте! Добро пожаловать в клуб.\n\nНажмите кнопку ниже, чтобы заполнить анкету."
+    await users.add_user(
+        user_id=user_id,
+        username=message.from_user.username,
+        first_name=message.from_user.first_name,
+        last_name=message.from_user.last_name,
     )
 
-    # Проверяем, есть ли уже анкета
+    welcome_text = await _get_message_text(
+        BotMessageType.WELCOME,
+        "Здравствуйте! Нажмите кнопку ниже, чтобы заполнить анкету.",
+    )
     survey = await survey_manager.get_latest_survey(user_id)
-
     if survey:
-        # Пользователь уже когда‑то отправлял анкету — даём сразу кнопку статуса
         await message.answer(welcome_text, reply_markup=status_kb)
     else:
-        # Первая анкета
         await message.answer(welcome_text, reply_markup=user_main_kb)
+
+
+@user_router.message(Command("id"))
+async def show_my_id(message: Message):
+    await message.answer(f"Ваш ID: <code>{message.from_user.id}</code>")
+
 
 async def handler_answers_survey(
     event: Message | CallbackQuery,
@@ -59,155 +96,189 @@ async def handler_answers_survey(
     form: FormManager,
     event_data: UserCallback | None = None,
 ):
-    """Обработчик ответов на вопросы анкеты"""
     data = await state.get_data()
     answer = event.text if isinstance(event, Message) else event_data.value
     user_id = event.from_user.id
     question_id = data["question_id"]
     total = data["total_questions"]
-    
-    # Добавляем ответ
+
     success = await users.add_answer(user_id, question_id, answer)
     if not success:
-        logger.error(f"Не удалось добавить ответ пользователя {user_id}")
+        logger.error("Не удалось сохранить ответ пользователя %s", user_id)
         return
-    
-    # Проверяем, все ли вопросы ответены
+
     if question_id >= total:
-        # Собираем все ответы пользователя и создаём запись анкеты
         answers = await users.get_answers(user_id)
-        if not answers:
-            logger.error(f"Не удалось получить ответы пользователя {user_id} для анкеты")
-        else:
-            try:
-                await survey_manager.submit_survey(user_id=user_id, answers=answers)
-            except Exception as e:
-                logger.error(f"Ошибка при сохранении анкеты пользователя {user_id}: {e}")
+        if answers:
+            await survey_manager.submit_survey(user_id=user_id, answers=answers)
 
-        text_done = (
-            "✅ Анкета отправлена на рассмотрение!\n\n"
-            "Администратор проверит ваши ответы и примет решение.\n"
-            "Вы можете следить за статусом через кнопку «Статус»."
+        text_done = await _get_message_text(
+            BotMessageType.SURVEY_SUBMITTED,
+            "Анкета отправлена на рассмотрение.\n\nСледите за статусом через кнопку «Статус профиля».",
         )
-
         if isinstance(event, Message):
             await event.answer(text_done, reply_markup=status_kb)
         else:
             await event.message.edit_text(text_done)
-
         await state.clear()
         return
-    
-    # Переходим к следующему вопросу
+
     next_id = question_id + 1
-    next_question = form.get_question_by_id(next_id)
+    next_question = await form.get_question_by_id(next_id)
     if not next_question:
-        logger.error(f"Вопрос #{next_id} не найден в анкете")
+        logger.error("Вопрос %s не найден", next_id)
         return
-    
+
     await state.update_data(question_id=next_id)
-    text = (
-        f"Вопрос {next_id}/{total}:\n"
-        f"{next_question['text']}"
-    )
+    text = f"Вопрос {next_id}/{total}:\n{next_question['text']}"
     kb = yes_no_kb if next_question["type"] == "yes_no" else None
-    
     if isinstance(event, Message):
         await event.answer(text, reply_markup=kb)
     else:
         await event.message.edit_text(text, reply_markup=kb)
 
+
 @user_router.callback_query(UserCallback.filter(F.action == UserAction.FILL_SURVEY))
 async def start_filling_survey(
-    callback: CallbackQuery, 
-    state: FSMContext, 
-    form: FormManager, 
-    users: UserManager):
-    """Начало заполнения анкеты"""
-    if len(form) < 1:
-        await callback.answer("❌ Анкеты пока нет", show_alert=True)
-        return
-
-    user_id = callback.from_user.id
-
-    # Добавляем пользователя в БД если его еще нет
-    await users.add_user(
-        user_id=user_id,
+    callback: CallbackQuery,
+    state: FSMContext,
+    form: FormManager,
+    users: UserManager,
+):
+    ok, err, text, kb = await _start_survey_flow(
+        user_id=callback.from_user.id,
         username=callback.from_user.username,
         first_name=callback.from_user.first_name,
         last_name=callback.from_user.last_name,
+        state=state,
+        form=form,
+        users=users,
     )
-
-    # Очищаем старые ответы пользователя перед новым заполнением
-    await users.clear_answers(user_id)
-    
-    current_index = 1
-    total_questions = len(form)
-    question = form.get_question_by_id(current_index)
-    
-    if not question:
-        logger.error(f"Вопрос #{current_index} не найден")
-        await callback.answer("❌ Ошибка при загрузке анкеты", show_alert=True)
+    if not ok:
+        await callback.answer(err, show_alert=True)
         return
-    
-    await state.set_state(UserFSM.filling_survey)
-    await state.update_data(
-        total_questions=total_questions,
-        question_id=current_index,
-    )
-    
-    await callback.message.edit_text(
-        text=f'Вопрос {current_index}/{total_questions}:\n{question["text"]}',
-        reply_markup=yes_no_kb if question['type'] == 'yes_no' else None
-    )
+    await callback.message.edit_text(text=text, reply_markup=kb)
     await callback.answer()
 
 
-@user_router.message(F.text == "Статус")
-async def survey_and_subscription_status(message: Message):
-    """Показать статус анкеты и подписки пользователю."""
-    user_id = message.from_user.id
+@user_router.message(F.text == "Анкета")
+async def restart_survey_from_menu(
+    message: Message,
+    state: FSMContext,
+    form: FormManager,
+    users: UserManager,
+):
+    latest = await survey_manager.get_latest_survey(message.from_user.id)
+    if latest and latest.status != SurveyStatusEnum.REJECTED:
+        await message.answer(
+            "Повторная анкета доступна после отклонения текущей анкеты.",
+            reply_markup=status_kb,
+        )
+        return
 
+    ok, err, text, kb = await _start_survey_flow(
+        user_id=message.from_user.id,
+        username=message.from_user.username,
+        first_name=message.from_user.first_name,
+        last_name=message.from_user.last_name,
+        state=state,
+        form=form,
+        users=users,
+    )
+    if not ok:
+        await message.answer(err, reply_markup=status_kb)
+        return
+    await message.answer(text, reply_markup=kb)
+
+
+@user_router.message((F.text == "Статус") | (F.text == "Статус профиля"))
+async def survey_and_subscription_status(message: Message):
+    user_id = message.from_user.id
     survey = await survey_manager.get_latest_survey(user_id)
     subscription = await payment_manager.get_user_subscription(user_id)
-
     parts: list[str] = []
 
-    # Статус анкеты
     if not survey:
-        parts.append("📝 Анкета ещё не заполнена.\nНажмите кнопку «Заполнить анкету», чтобы начать.")
+        parts.append(
+            await _get_message_text(
+                BotMessageType.STATUS_EMPTY, "Анкета еще не заполнена."
+            )
+        )
     else:
         status_map = {
-            SurveyStatusEnum.PENDING_REVIEW: "⏳ На проверке у администратора",
-            SurveyStatusEnum.PENDING_PAYMENT: "💳 Одобрена, ожидается оплата",
-            SurveyStatusEnum.REJECTED: "❌ Отклонена",
-            SurveyStatusEnum.PAID: "✅ Оплачена, доступ открыт",
-            SurveyStatusEnum.APPROVED: "✅ Одобрена (ожидает дальнейших шагов)",
+            SurveyStatusEnum.PENDING_REVIEW: "На проверке",
+            SurveyStatusEnum.PENDING_PAYMENT: "Одобрена, ожидается оплата",
+            SurveyStatusEnum.REJECTED: "Отклонена",
+            SurveyStatusEnum.PAID: "Оплачена",
+            SurveyStatusEnum.APPROVED: "Одобрена",
         }
-        human_status = status_map.get(survey.status, survey.status.value)
-        parts.append(f"📝 Статус анкеты: {human_status}")
+        parts.append(f"Статус анкеты: {status_map.get(survey.status, str(survey.status))}")
+        if survey.personal_discount:
+            parts.append(f"Персональная скидка: {survey.personal_discount}%")
+        if survey.promo_discount:
+            parts.append(f"Промокод: {survey.promo_discount}%")
 
-    # Статус подписки
     if subscription:
-        plan_id = subscription.plan_id
-        # Получаем название тарифа
         plans = await payment_manager.get_payment_plans()
-        plan_name = next((p.name for p in plans if p.id == plan_id), "Тариф")
-        end_date = subscription.end_date.strftime("%d.%m.%Y")
-        parts.append(f"🎫 Подписка: {plan_name} до {end_date}")
+        plan_name = next((p.name for p in plans if p.id == subscription.plan_id), "Тариф")
+        parts.append(f"Подписка: {plan_name} до {subscription.end_date.strftime('%d.%m.%Y')}")
     else:
-        parts.append("🎫 Активной подписки сейчас нет.")
+        parts.append("Активной подписки нет.")
 
-    await message.answer("\n\n".join(parts))
+    await message.answer("<b>Статус профиля</b>\n\n" + "\n\n".join(parts))
+
+
+@user_router.message(F.text == "Тарифы")
+async def show_tariffs(message: Message):
+    plans = await payment_manager.get_payment_plans()
+    if not plans:
+        await message.answer("Активные тарифы пока не добавлены.", reply_markup=status_kb)
+        return
+
+    header = await _get_message_text(BotMessageType.TARIFFS_HEADER, "<b>Доступные тарифы</b>")
+    lines = [header]
+    for plan in plans:
+        line = f"• <b>{plan.name}</b> — {plan.price:.2f} ₽ / {plan.duration_days} дн."
+        if plan.description:
+            line += f"\n{plan.description}"
+        lines.append(line)
+    await message.answer("\n\n".join(lines), reply_markup=status_kb)
+
+
+@user_router.message(F.text == "Промокод")
+async def promo_code_start(message: Message, state: FSMContext):
+    await state.set_state(UserFSM.waiting_promo_code)
+    await message.answer("Введите промокод:")
+
+
+@user_router.message(UserFSM.waiting_promo_code)
+async def promo_code_process(message: Message, state: FSMContext):
+    code = message.text.strip()
+    ok, text, _discount = await survey_manager.apply_promo_code_to_latest_survey(
+        message.from_user.id, code
+    )
+    if ok:
+        applied_template = await _get_message_text(
+            BotMessageType.PROMO_APPLIED, "Промокод применен: {text}"
+        )
+        reply = applied_template.replace("{text}", text)
+    else:
+        invalid_template = await _get_message_text(
+            BotMessageType.PROMO_INVALID, "Промокод не применен: {text}"
+        )
+        reply = invalid_template.replace("{text}", text)
+
+    await message.answer(reply, reply_markup=status_kb)
+    await state.clear()
+
 
 @user_router.message(UserFSM.filling_survey)
 async def survey_text(
-    message: Message, 
-    state: FSMContext, 
-    users: UserManager, 
+    message: Message,
+    state: FSMContext,
+    users: UserManager,
     form: FormManager,
 ):
-    """Обработка текстовых ответов на вопросы"""
     await handler_answers_survey(
         event=message,
         state=state,
@@ -215,15 +286,18 @@ async def survey_text(
         form=form,
     )
 
-@user_router.callback_query(UserFSM.filling_survey, UserCallback.filter(F.action == UserAction.YES_NO_ANSWER))
+
+@user_router.callback_query(
+    UserFSM.filling_survey,
+    UserCallback.filter(F.action == UserAction.YES_NO_ANSWER),
+)
 async def survey_yes_no(
-    callback: CallbackQuery, 
-    callback_data: UserCallback, 
-    state: FSMContext, 
-    users: UserManager, 
+    callback: CallbackQuery,
+    callback_data: UserCallback,
+    state: FSMContext,
+    users: UserManager,
     form: FormManager,
 ):
-    """Обработка ответов yes/no на вопросы"""
     await handler_answers_survey(
         event=callback,
         event_data=callback_data,
@@ -232,14 +306,3 @@ async def survey_yes_no(
         form=form,
     )
     await callback.answer()
-
-
-
-
-
-
-
-
-
-
-

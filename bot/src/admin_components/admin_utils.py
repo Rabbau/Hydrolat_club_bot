@@ -5,6 +5,16 @@ import src.admin_components.admin_keyboards as kb
 from src.db_components.survey_manager import admin_manager
 
 
+def _parse_env_int(value: str | None) -> int | None:
+    if not value:
+        return None
+    cleaned = value.strip().strip("\"'")
+    try:
+        return int(cleaned)
+    except ValueError:
+        return None
+
+
 async def show_admin_main_menu(callback_or_message: CallbackQuery | Message):
     text, keyboard = "Admin menu:", kb.admin_main_menu_inline_keyboard
     if isinstance(callback_or_message, CallbackQuery):
@@ -33,13 +43,8 @@ async def show_super_admin_menu(callback_or_message: CallbackQuery | Message):
     )
 
     # Сначала проверяем переменную окружения SUPER_ADMIN_ID
-    super_admin_id_str = os.getenv("SUPER_ADMIN_ID")
-    is_env_super_admin = False
-    try:
-        if super_admin_id_str and user.id == int(super_admin_id_str):
-            is_env_super_admin = True
-    except ValueError:
-        is_env_super_admin = False
+    super_admin_id = _parse_env_int(os.getenv("SUPER_ADMIN_ID"))
+    is_env_super_admin = super_admin_id is not None and user.id == super_admin_id
 
     # Затем проверяем БД
     is_db_super_admin = await admin_manager.is_super_admin(user.id)

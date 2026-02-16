@@ -1,8 +1,5 @@
-import json
-from pathlib import Path
 from typing import Dict, Any, Optional, List
-from sqlalchemy import select, delete, update, and_
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, delete, and_
 from .database import get_db_session
 from .models import User, UserAnswer
 from datetime import datetime
