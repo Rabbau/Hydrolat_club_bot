@@ -6,6 +6,12 @@ class AdminAction(StrEnum):
     MODERATION = "moderation"
     HISTORY = "history"
     STATISTICS = "statistics"
+    STATS_USERS = "stats_users"
+    STATS_PENDING_REVIEW = "stats_pending_review"
+    STATS_PENDING_PAYMENT = "stats_pending_payment"
+    STATS_PAID = "stats_paid"
+    STATS_REJECTED = "stats_rejected"
+    STATS_ACTIVE_SUBS = "stats_active_subs"
     OUTPUT_SETTINGS = "output_settings"
     SURVEY_BACK = "back"
 

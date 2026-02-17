@@ -195,6 +195,15 @@ class PaymentManager:
             )
             return result.scalar_one_or_none()
 
+    async def get_active_subscriptions(self) -> List[Subscription]:
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(Subscription).where(
+                    Subscription.status == SubscriptionStatusEnum.ACTIVE
+                )
+            )
+            return result.scalars().all()
+
 
 class PromoCodeManager:
     async def create_promo_code(

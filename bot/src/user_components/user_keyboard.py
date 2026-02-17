@@ -50,3 +50,17 @@ user_survey_check_status = ReplyKeyboardMarkup(
     resize_keyboard=True,
     one_time_keyboard=False,
 )
+
+
+admin_survey_check_status = ReplyKeyboardMarkup(
+    keyboard=[
+        [
+            KeyboardButton(text="Админка"),
+            KeyboardButton(text="Статус профиля"),
+            KeyboardButton(text="Промокод"),
+            KeyboardButton(text="Тарифы"),
+        ],
+    ],
+    resize_keyboard=True,
+    one_time_keyboard=False,
+)

@@ -63,6 +63,12 @@ super_admin_settings_inline_keyboard = InlineKeyboardMarkup(
         ],
         [
             InlineKeyboardButton(
+                text="Список тарифов",
+                callback_data=AdminCallback(action=AdminAction.LIST_PLANS).pack(),
+            )
+        ],
+        [
+            InlineKeyboardButton(
                 text="Список админов",
                 callback_data=AdminCallback(action=AdminAction.LIST_ADMINS).pack(),
             ),
@@ -71,18 +77,6 @@ super_admin_settings_inline_keyboard = InlineKeyboardMarkup(
             InlineKeyboardButton(
                 text="Создать промокод",
                 callback_data=AdminCallback(action=AdminAction.CREATE_PROMO).pack(),
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                text="Добавить тариф",
-                callback_data=AdminCallback(action=AdminAction.CREATE_PLAN).pack(),
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                text="Список тарифов",
-                callback_data=AdminCallback(action=AdminAction.LIST_PLANS).pack(),
             )
         ],
         [

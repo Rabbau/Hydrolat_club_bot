@@ -35,14 +35,17 @@ async def survey_menu_elements_back(
 @survey_router.callback_query(SurveyCallback.filter(F.action == SurveyAction.ADD_QUESTION))
 async def add_question_start(callback: CallbackQuery, state: FSMContext):
     await state.set_state(SurveyFSM.add_question)
-    await callback.message.edit_text(text="Введите вопрос: ", reply_markup=back_kb)
+    await callback.message.edit_text(
+        text="Введите текст нового вопроса:",
+        reply_markup=back_kb,
+    )
     await callback.answer()
 
 
 @survey_router.message(SurveyFSM.add_question)
 async def add_question_type(message: Message, state: FSMContext):
     await state.update_data(add_question=message.text)
-    await message.answer(text="Выберите тип ответа:", reply_markup=question_type_kb)
+    await message.answer(text="Выберите тип ответа для вопроса:", reply_markup=question_type_kb)
 
 
 @survey_router.callback_query(SurveyFSM.add_question, F.data.startswith("type:"))
@@ -55,7 +58,7 @@ async def add_question_process(
     question_type = data.get("add_question_type").split(":", 1)[1]
     await form.add_question(question_text, question_type)
     await callback.message.edit_text(
-        text=f"Добавлен вопрос:\n{question_text}\nТип ответа:\n{question_type}",
+        text=f"Вопрос добавлен:\n\n{question_text}\n\nТип ответа: {question_type}",
         reply_markup=add_or_back_kb,
     )
     await state.clear()
@@ -65,28 +68,31 @@ async def add_question_process(
 @survey_router.callback_query(SurveyCallback.filter(F.action == SurveyAction.DELETE_QUESTION))
 async def delete_question_start(callback: CallbackQuery, state: FSMContext):
     await state.set_state(SurveyFSM.delete_question)
-    await callback.message.edit_text(
-        text="Введите номер вопроса для удаления:", reply_markup=back_kb
+    await callback.message.answer(
+        text="Введите номер вопроса, который нужно удалить:",
+        reply_markup=back_kb,
     )
     await callback.answer()
 
 
 @survey_router.message(SurveyFSM.delete_question)
-async def delete_question_process(
-    message: Message, state: FSMContext, form: FormManager
-):
+async def delete_question_process(message: Message, state: FSMContext, form: FormManager):
+    if not message.text:
+        await message.answer("Отправьте номер вопроса цифрами, например: 2")
+        return
+
     question_id = await survey_int_validator(message)
     if question_id is None:
         return
 
     if await form.delete_question(question_id):
         await message.answer(
-            text=f"Вопрос #{question_id} успешно удалён!",
+            text=f"Вопрос №{question_id} удален.",
             reply_markup=back_kb,
         )
     else:
         await message.answer(
-            text=f"Вопрос с номером {question_id} не найден.",
+            text=f"Вопрос №{question_id} не найден. Проверьте номер и попробуйте снова.",
             reply_markup=back_kb,
         )
     await state.clear()
@@ -109,7 +115,7 @@ async def edit_question_id(message: Message, state: FSMContext, form: FormManage
         return
     if not await form.get_question_by_id(question_id):
         await message.answer(
-            text=f"Вопрос с номером {question_id} не найден. Попробуй ещё раз.",
+            text=f"Вопрос №{question_id} не найден. Попробуйте еще раз.",
             reply_markup=back_kb,
         )
         return
@@ -156,7 +162,7 @@ async def edit_question_process(
         new_type=new_type,
     )
     await callback.message.edit_text(
-        text=f"Вопрос #{data['edit_question_id']} успешно изменён",
+        text=f"Вопрос №{data['edit_question_id']} успешно обновлен.",
         reply_markup=back_kb,
     )
     await state.clear()
