@@ -11,6 +11,8 @@ from sqlalchemy import (
     Float,
     Boolean,
     Integer,
+    Index,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.sql import func
@@ -90,6 +92,9 @@ class SurveySubmission(Base):
         Integer, ForeignKey("promo_codes.id"), nullable=True
     )
     promo_discount: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    selected_plan_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("payment_plans.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -170,6 +175,14 @@ class PromoCode(Base):
 
 class Subscription(Base):
     __tablename__ = "subscriptions"
+    __table_args__ = (
+        Index(
+            "uq_subscriptions_user_active",
+            "user_id",
+            unique=True,
+            postgresql_where=text("status = 'active'"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(
@@ -186,6 +199,9 @@ class Subscription(Base):
     price_paid: Mapped[float] = mapped_column(Float, nullable=False)
     promo_code_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("promo_codes.id"), nullable=True
+    )
+    reminder_sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -221,12 +237,15 @@ class BotMessageType(StrEnum):
     WELCOME = "welcome"
     SURVEY_SUBMITTED = "survey_submitted"
     PAYMENT_DETAILS = "payment_details"
+    CHAT_RULES = "chat_rules"
     PAYMENT_CONFIRMED = "payment_confirmed"
     SURVEY_REJECTED = "survey_rejected"
     STATUS_EMPTY = "status_empty"
     PROMO_APPLIED = "promo_applied"
     PROMO_INVALID = "promo_invalid"
     TARIFFS_HEADER = "tariffs_header"
+    SUBSCRIPTION_EXPIRING_SOON = "subscription_expiring_soon"
+    SUBSCRIPTION_EXPIRED = "subscription_expired"
 
 
 class BotMessage(Base):

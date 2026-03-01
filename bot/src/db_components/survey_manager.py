@@ -1,7 +1,8 @@
-from datetime import datetime, timedelta
+﻿from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
-from sqlalchemy import and_, desc, func, select
+from sqlalchemy import and_, desc, func, select, text
+from sqlalchemy.exc import IntegrityError
 
 from .database import get_db_session
 from .models import (
@@ -94,13 +95,21 @@ class SurveyManager:
             if not survey:
                 return False, "Сначала заполните анкету", 0
             if survey.status in (SurveyStatusEnum.PAID, SurveyStatusEnum.REJECTED):
-                return False, "Для этой анкеты промокод уже нельзя применить", 0
+                return (
+                    False,
+                    "Для этой анкеты промокод уже нельзя применить",
+                    0,
+                )
 
             survey.promo_code_id = promo.id
             survey.promo_discount = promo.discount_percent
             survey.updated_at = datetime.utcnow()
 
-        return True, f"Промокод применен: скидка {promo.discount_percent}%", promo.discount_percent
+        return (
+            True,
+            f"Промокод применен: скидка {promo.discount_percent}%",
+            promo.discount_percent,
+        )
 
     async def get_status_counts(self) -> Dict[str, int]:
         async with get_db_session() as session:
@@ -119,6 +128,94 @@ class SurveyManager:
         for status, count in rows:
             counts[str(status)] = int(count)
         return counts
+
+    async def create_or_update_renewal_payment_request(
+        self, user_id: int, plan_id: int
+    ) -> SurveySubmission | None:
+        async with get_db_session() as session:
+            # Serialize concurrent renewal/payment actions for the same user.
+            await session.execute(
+                text("SELECT pg_advisory_xact_lock(:lock_key)"),
+                {"lock_key": user_id},
+            )
+            pending_result = await session.execute(
+                select(SurveySubmission)
+                .where(
+                    and_(
+                        SurveySubmission.user_id == user_id,
+                        SurveySubmission.status == SurveyStatusEnum.PENDING_PAYMENT,
+                    )
+                )
+                .order_by(desc(SurveySubmission.created_at))
+            )
+            pending_surveys = pending_result.scalars().all()
+
+            renewal_pending = next(
+                (
+                    s
+                    for s in pending_surveys
+                    if (s.answers or {}).get("request_type") == "subscription_renewal"
+                ),
+                None,
+            )
+            if renewal_pending:
+                renewal_pending.selected_plan_id = plan_id
+                renewal_pending.updated_at = datetime.utcnow()
+                return renewal_pending
+
+            latest_pending = pending_surveys[0] if pending_surveys else None
+            if latest_pending:
+                return None
+
+            request = SurveySubmission(
+                user_id=user_id,
+                status=SurveyStatusEnum.PENDING_PAYMENT,
+                answers={"request_type": "subscription_renewal"},
+                selected_plan_id=plan_id,
+                personal_discount=0,
+                promo_discount=0,
+            )
+            session.add(request)
+            await session.flush()
+            return request
+
+    async def set_selected_plan_for_pending_payment(
+        self, user_id: int, plan_id: int
+    ) -> SurveySubmission | None:
+        async with get_db_session() as session:
+            await session.execute(
+                text("SELECT pg_advisory_xact_lock(:lock_key)"),
+                {"lock_key": user_id},
+            )
+            result = await session.execute(
+                select(SurveySubmission)
+                .where(
+                    and_(
+                        SurveySubmission.user_id == user_id,
+                        SurveySubmission.status == SurveyStatusEnum.PENDING_PAYMENT,
+                    )
+                )
+                .order_by(desc(SurveySubmission.created_at))
+            )
+            surveys = result.scalars().all()
+            if not surveys:
+                return None
+
+            # Prefer regular approved survey request; skip renewal technical requests.
+            target = next(
+                (
+                    s
+                    for s in surveys
+                    if (s.answers or {}).get("request_type") != "subscription_renewal"
+                ),
+                None,
+            )
+            if not target:
+                return None
+
+            target.selected_plan_id = plan_id
+            target.updated_at = datetime.utcnow()
+            return target
 
 
 class PaymentManager:
@@ -160,28 +257,105 @@ class PaymentManager:
         promo_code_id: int = None,
         custom_price: float = None,
     ) -> bool:
+        try:
+            async with get_db_session() as session:
+                # Serialize concurrent subscription writes for the same user.
+                await session.execute(
+                    text("SELECT pg_advisory_xact_lock(:lock_key)"),
+                    {"lock_key": user_id},
+                )
+
+                result = await session.execute(
+                    select(PaymentPlan).where(PaymentPlan.id == plan_id)
+                )
+                plan = result.scalar_one_or_none()
+                if not plan:
+                    return False
+
+                existing_active = await session.execute(
+                    select(Subscription)
+                    .where(
+                        and_(
+                            Subscription.user_id == user_id,
+                            Subscription.status == SubscriptionStatusEnum.ACTIVE,
+                        )
+                    )
+                    .with_for_update()
+                )
+                if existing_active.scalars().first():
+                    return False
+
+                price = custom_price if custom_price is not None else plan.price
+                start_date = datetime.utcnow()
+                end_date = start_date + timedelta(days=plan.duration_days)
+                subscription = Subscription(
+                    user_id=user_id,
+                    plan_id=plan_id,
+                    start_date=start_date,
+                    end_date=end_date,
+                    price_paid=price,
+                    promo_code_id=promo_code_id,
+                    status=SubscriptionStatusEnum.ACTIVE,
+                )
+                session.add(subscription)
+                return True
+        except IntegrityError:
+            return False
+
+    async def extend_current_subscription(
+        self, user_id: int, plan_id: int, custom_price: float | None = None
+    ) -> Subscription | None:
         async with get_db_session() as session:
-            result = await session.execute(
+            plan_result = await session.execute(
                 select(PaymentPlan).where(PaymentPlan.id == plan_id)
             )
-            plan = result.scalar_one_or_none()
+            plan = plan_result.scalar_one_or_none()
             if not plan:
-                return False
+                return None
 
-            price = custom_price if custom_price is not None else plan.price
-            start_date = datetime.utcnow()
-            end_date = start_date + timedelta(days=plan.duration_days)
-            subscription = Subscription(
-                user_id=user_id,
-                plan_id=plan_id,
-                start_date=start_date,
-                end_date=end_date,
-                price_paid=price,
-                promo_code_id=promo_code_id,
-                status=SubscriptionStatusEnum.ACTIVE,
+            sub_result = await session.execute(
+                select(Subscription)
+                .where(
+                    and_(
+                        Subscription.user_id == user_id,
+                        Subscription.status.in_(
+                            [SubscriptionStatusEnum.ACTIVE, SubscriptionStatusEnum.EXPIRED]
+                        ),
+                    )
+                )
+                .order_by(desc(Subscription.end_date))
             )
-            session.add(subscription)
-            return True
+            current_sub = sub_result.scalars().first()
+            if not current_sub:
+                return None
+
+            now = datetime.utcnow()
+            base_end = current_sub.end_date if current_sub.end_date > now else now
+            current_sub.end_date = base_end + timedelta(days=plan.duration_days)
+            current_sub.status = SubscriptionStatusEnum.ACTIVE
+            current_sub.plan_id = plan_id
+            current_sub.price_paid = custom_price if custom_price is not None else plan.price
+            current_sub.reminder_sent_at = None
+            current_sub.updated_at = now
+            return current_sub
+
+    async def get_latest_subscription_for_renewal(
+        self, user_id: int
+    ) -> Optional[Subscription]:
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(Subscription)
+                .where(
+                    and_(
+                        Subscription.user_id == user_id,
+                        Subscription.status.in_(
+                            [SubscriptionStatusEnum.ACTIVE, SubscriptionStatusEnum.EXPIRED]
+                        ),
+                    )
+                )
+                .order_by(desc(Subscription.end_date))
+            )
+            return result.scalars().first()
 
     async def get_user_subscription(self, user_id: int) -> Optional[Subscription]:
         async with get_db_session() as session:
@@ -203,6 +377,59 @@ class PaymentManager:
                 )
             )
             return result.scalars().all()
+
+    async def get_subscriptions_for_renewal_reminder(
+        self, days_before_end: int
+    ) -> List[Subscription]:
+        now = datetime.utcnow()
+        limit = now + timedelta(days=days_before_end)
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(Subscription).where(
+                    and_(
+                        Subscription.status == SubscriptionStatusEnum.ACTIVE,
+                        Subscription.end_date > now,
+                        Subscription.end_date <= limit,
+                        Subscription.reminder_sent_at.is_(None),
+                    )
+                )
+            )
+            return result.scalars().all()
+
+    async def mark_renewal_reminder_sent(self, subscription_id: int) -> bool:
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(Subscription).where(Subscription.id == subscription_id)
+            )
+            sub = result.scalar_one_or_none()
+            if not sub:
+                return False
+            sub.reminder_sent_at = datetime.utcnow()
+            return True
+
+    async def get_expired_active_subscriptions(self) -> List[Subscription]:
+        now = datetime.utcnow()
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(Subscription).where(
+                    and_(
+                        Subscription.status == SubscriptionStatusEnum.ACTIVE,
+                        Subscription.end_date <= now,
+                    )
+                )
+            )
+            return result.scalars().all()
+
+    async def mark_subscription_expired(self, subscription_id: int) -> bool:
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(Subscription).where(Subscription.id == subscription_id)
+            )
+            sub = result.scalar_one_or_none()
+            if not sub:
+                return False
+            sub.status = SubscriptionStatusEnum.EXPIRED
+            return True
 
 
 class PromoCodeManager:
@@ -347,35 +574,40 @@ class BotMessageManager:
         async with get_db_session() as session:
             result = await session.execute(select(BotMessage))
             return result.scalars().all()
-
     async def init_default_messages(self) -> None:
         default_messages = [
             (
                 BotMessageType.WELCOME,
-                "👋 Добро пожаловать в дискуссионный клуб по гидролатам!\n\n"
+                "Добро пожаловать в дискуссионный клуб по гидролатам!\n\n"
                 "Для вступления заполните анкету.",
             ),
             (
                 BotMessageType.PAYMENT_DETAILS,
-                "💳 <b>Реквизиты для оплаты:</b>\n\n"
+                "<b>Реквизиты для оплаты:</b>\n\n"
                 "Номер счета: 12345678901234567890\n"
                 "Получатель: ООО Гидролаты\n"
                 "БИК: 044525225\n\n"
                 "После оплаты напишите администратору.",
             ),
             (
+                BotMessageType.CHAT_RULES,
+                "<b>Правила чата</b>\n\n"
+                "Оплачивая, вы подтверждаете, что ознакомлены и согласны с правилами сообщества.",
+            ),
+            (
                 BotMessageType.PAYMENT_CONFIRMED,
-                "✅ <b>Спасибо за оплату!</b>\n\n"
+                "<b>Спасибо за оплату!</b>\n\n"
                 "Ваша подписка активирована. Добро пожаловать в клуб!",
             ),
             (
                 BotMessageType.SURVEY_REJECTED,
-                "❌ <b>К сожалению, ваша анкета отклонена.</b>\n\n"
+                "<b>К сожалению, ваша анкета отклонена.</b>\n\n"
                 "Если есть вопросы, свяжитесь с администратором.",
             ),
             (
                 BotMessageType.SURVEY_SUBMITTED,
-                "Анкета отправлена на рассмотрение.\n\nСледите за статусом через кнопку «Статус профиля».",
+                "Анкета отправлена на рассмотрение.\n\n"
+                "Следите за статусом через кнопку «Статус профиля».",
             ),
             (
                 BotMessageType.STATUS_EMPTY,
@@ -383,15 +615,25 @@ class BotMessageManager:
             ),
             (
                 BotMessageType.PROMO_APPLIED,
-                "✅ {text}",
+                "{text}",
             ),
             (
                 BotMessageType.PROMO_INVALID,
-                "❌ {text}",
+                "{text}",
             ),
             (
                 BotMessageType.TARIFFS_HEADER,
                 "<b>Доступные тарифы</b>",
+            ),
+            (
+                BotMessageType.SUBSCRIPTION_EXPIRING_SOON,
+                "Ваша подписка заканчивается {end_date}. До окончания осталось {days_left} дн.\n\n"
+                "Чтобы продлить доступ, свяжитесь с администратором.",
+            ),
+            (
+                BotMessageType.SUBSCRIPTION_EXPIRED,
+                "Срок вашей подписки истек.\n\n"
+                "Чтобы восстановить доступ, оформите продление у администратора.",
             ),
         ]
 
@@ -403,7 +645,6 @@ class BotMessageManager:
                 existing = result.scalar_one_or_none()
                 if existing is None:
                     session.add(BotMessage(message_type=message_type, content=content))
-
     async def update_message(self, message_type: BotMessageType, content: str) -> bool:
         async with get_db_session() as session:
             result = await session.execute(
@@ -424,3 +665,4 @@ payment_manager = PaymentManager()
 promo_code_manager = PromoCodeManager()
 admin_manager = AdminManager()
 bot_message_manager = BotMessageManager()
+

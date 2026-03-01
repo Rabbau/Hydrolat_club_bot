@@ -13,6 +13,7 @@ from src.admin_components.admin_router import admin_router
 from src.db_components.database import create_tables
 from src.db_components.db_middleware import DBMiddleware
 from src.db_components.survey_manager import bot_message_manager
+from src.subscription_components.subscription_notifier import SubscriptionNotifier
 from src.user_components.user_router import user_router
 
 logging.basicConfig(
@@ -38,7 +39,8 @@ async def main() -> None:
         return
 
     try:
-        await create_tables()
+        if os.getenv("RUN_MIGRATIONS_ON_START", "false").lower() == "true":
+            await create_tables()
         await bot_message_manager.init_default_messages()
     except Exception as exc:
         logger.error("Database initialization failed: %s", exc)
@@ -48,6 +50,8 @@ async def main() -> None:
         token=bot_token,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
+    notifier = SubscriptionNotifier(days_before_end=14, poll_interval_seconds=3600)
+    notifier_task = asyncio.create_task(notifier.run(bot))
     dp = Dispatcher(storage=MemoryStorage())
     form = FormManager()
 
@@ -61,6 +65,8 @@ async def main() -> None:
         await bot.delete_webhook(drop_pending_updates=True)
         await dp.start_polling(bot)
     finally:
+        notifier_task.cancel()
+        await asyncio.gather(notifier_task, return_exceptions=True)
         await bot.session.close()
 
 

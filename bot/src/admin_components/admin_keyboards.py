@@ -1,4 +1,4 @@
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+﻿from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from src.admin_components.admin_callbacks import AdminAction, AdminCallback
 
@@ -123,6 +123,12 @@ output_settings_inline_keyboard = InlineKeyboardMarkup(
         ],
         [
             InlineKeyboardButton(
+                text="Правила чата",
+                callback_data=AdminCallback(action=AdminAction.EDIT_CHAT_RULES).pack(),
+            ),
+        ],
+        [
+            InlineKeyboardButton(
                 text="Отправка анкеты",
                 callback_data=AdminCallback(action=AdminAction.EDIT_SURVEY_SUBMITTED).pack(),
             ),
@@ -145,6 +151,20 @@ output_settings_inline_keyboard = InlineKeyboardMarkup(
             InlineKeyboardButton(
                 text="Заголовок тарифов",
                 callback_data=AdminCallback(action=AdminAction.EDIT_TARIFFS_HEADER).pack(),
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                text="Подписка: за 14 дней",
+                callback_data=AdminCallback(
+                    action=AdminAction.EDIT_SUBSCRIPTION_EXPIRING_SOON
+                ).pack(),
+            ),
+            InlineKeyboardButton(
+                text="Подписка: окончена",
+                callback_data=AdminCallback(
+                    action=AdminAction.EDIT_SUBSCRIPTION_EXPIRED
+                ).pack(),
             ),
         ],
         [

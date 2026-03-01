@@ -1,4 +1,7 @@
-import logging
+﻿import logging
+
+import os
+from datetime import datetime, timezone
 
 from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
@@ -14,7 +17,7 @@ from src.admin_components.admin_keyboards import (
     output_settings_inline_keyboard,
 )
 from src.db_components.database import get_db_session
-from src.db_components.models import BotMessageType, SurveyStatusEnum, SurveySubmission
+from src.db_components.models import BotMessageType, SurveyStatusEnum, SurveySubmission, User
 from src.db_components.survey_manager import (
     admin_manager,
     bot_message_manager,
@@ -22,6 +25,7 @@ from src.db_components.survey_manager import (
     promo_code_manager,
     survey_manager,
 )
+from src.user_components.user_callbacks import UserAction, UserCallback
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +43,94 @@ class ModerationFSM(StatesGroup):
     creating_plan = State()
 
 
+async def _users_display_map(user_ids: list[int]) -> dict[int, str]:
+    unique_ids = list(set(user_ids))
+    if not unique_ids:
+        return {}
+
+    async with get_db_session() as session:
+        result = await session.execute(select(User).where(User.id.in_(unique_ids)))
+        users = result.scalars().all()
+
+    display_map: dict[int, str] = {}
+    for user in users:
+        if user.username:
+            display_map[user.id] = f"@{user.username}"
+        else:
+            display_map[user.id] = "без_username"
+    return display_map
+
+
+def _fallback_user_label(user_id: int, users_map: dict[int, str]) -> str:
+    return users_map.get(user_id, "без_username")
+
+
+def _parse_env_int(value: str | None) -> int | None:
+    if not value:
+        return None
+    cleaned = value.strip().strip("\"'")
+    try:
+        return int(cleaned)
+    except ValueError:
+        return None
+
+
+def _parse_env_int_set(value: str | None) -> set[int]:
+    if not value:
+        return set()
+    result: set[int] = set()
+    for part in value.split(","):
+        parsed = _parse_env_int(part)
+        if parsed is not None:
+            result.add(parsed)
+    return result
+
+
+def _get_target_chat_ids() -> set[int]:
+    chat_ids: set[int] = set()
+    single_chat_id = _parse_env_int(os.getenv("GROUP_CHAT_ID"))
+    if single_chat_id is not None:
+        chat_ids.add(single_chat_id)
+    chat_ids.update(_parse_env_int_set(os.getenv("GROUP_CHAT_IDS")))
+    return chat_ids
+
+
+async def _create_personal_join_link(bot: Bot, user_id: int) -> str | None:
+    for chat_id in sorted(_get_target_chat_ids()):
+        try:
+            link = await bot.create_chat_invite_link(
+                chat_id=chat_id,
+                name=f"paid_user_{user_id}_{int(datetime.now(timezone.utc).timestamp())}",
+                creates_join_request=True,
+            )
+            return link.invite_link
+        except Exception as exc:
+            logger.error(
+                "Failed to create invite link for user %s in chat %s: %s",
+                user_id,
+                chat_id,
+                exc,
+            )
+    return None
+
+
+def _approved_survey_plans_keyboard(plans) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=f"{plan.name} ({plan.price:.2f} ₽ / {plan.duration_days} дн.)",
+                    callback_data=UserCallback(
+                        action=UserAction.APPROVED_SURVEY_SELECT_PLAN,
+                        plan_id=plan.id,
+                    ).pack(),
+                )
+            ]
+            for plan in plans
+        ]
+    )
+
+
 @moderation_router.callback_query(AdminCallback.filter(F.action == AdminAction.REVIEW_SURVEYS))
 async def review_surveys_menu(callback: CallbackQuery):
     surveys = await survey_manager.get_surveys_by_status(SurveyStatusEnum.PENDING_REVIEW)
@@ -50,14 +142,16 @@ async def review_surveys_menu(callback: CallbackQuery):
         await callback.answer()
         return
 
+    users_map = await _users_display_map([survey.user_id for survey in surveys])
     lines = ["<b>Анкеты на проверке:</b>\n"]
     kb_rows: list[list[InlineKeyboardButton]] = []
     for survey in surveys[:50]:
-        lines.append(f"• user <code>{survey.user_id}</code>, анкета <code>{survey.id}</code>")
+        username = _fallback_user_label(survey.user_id, users_map)
+        lines.append(f"• user <b>{username}</b>, анкета <code>{survey.id}</code>")
         kb_rows.append(
             [
                 InlineKeyboardButton(
-                    text=f"Анкета {survey.id} (user {survey.user_id})",
+                    text=f"Анкета {survey.id} ({username})",
                     callback_data=AdminCallback(
                         action=AdminAction.REVIEW_SURVEY_DETAIL, survey_id=survey.id
                     ).pack(),
@@ -96,9 +190,11 @@ async def review_survey_detail(
         await callback.answer("Анкета не найдена или уже обработана.", show_alert=True)
         return
 
+    users_map = await _users_display_map([target.user_id])
+    username = _fallback_user_label(target.user_id, users_map)
     lines = [
         f"<b>Анкета ID {target.id}</b>",
-        f"Пользователь: <code>{target.user_id}</code>",
+        f"Пользователь: <b>{username}</b>",
         "",
         "<b>Ответы:</b>",
     ]
@@ -173,6 +269,13 @@ async def approve_survey(callback: CallbackQuery, callback_data: AdminCallback):
         try:
             bot: Bot = callback.message.bot
             await bot.send_message(chat_id=survey.user_id, text=text)
+            plans = await payment_manager.get_payment_plans()
+            if plans:
+                await bot.send_message(
+                    chat_id=survey.user_id,
+                    text="Выберите тариф для оплаты:",
+                    reply_markup=_approved_survey_plans_keyboard(plans),
+                )
         except Exception as exc:
             logger.error("Failed to send payment details to %s: %s", survey.user_id, exc)
 
@@ -242,6 +345,13 @@ async def approve_survey_with_discount_process(message: Message, state: FSMConte
         try:
             bot: Bot = message.bot
             await bot.send_message(chat_id=survey.user_id, text=text)
+            plans = await payment_manager.get_payment_plans()
+            if plans:
+                await bot.send_message(
+                    chat_id=survey.user_id,
+                    text="Выберите тариф для оплаты:",
+                    reply_markup=_approved_survey_plans_keyboard(plans),
+                )
         except Exception as exc:
             logger.error("Failed to send payment details to %s: %s", survey.user_id, exc)
 
@@ -301,19 +411,34 @@ async def pending_payments(callback: CallbackQuery):
         await callback.answer()
         return
 
+    users_map = await _users_display_map([survey.user_id for survey in surveys])
+    plans = await payment_manager.get_payment_plans()
+    plan_map = {plan.id: plan for plan in plans}
     lines = ["<b>Ожидают подтверждения оплаты:</b>\n"]
     kb_rows: list[list[InlineKeyboardButton]] = []
     for survey in surveys[:50]:
+        username = _fallback_user_label(survey.user_id, users_map)
         personal = survey.personal_discount or 0
         promo = survey.promo_discount or 0
         total = min(100, personal + promo)
+        if survey.selected_plan_id is None:
+            selected_plan_label = "не выбран"
+        else:
+            selected_plan = plan_map.get(survey.selected_plan_id)
+            if selected_plan:
+                selected_plan_label = (
+                    f"{selected_plan.name} ({selected_plan.price:.2f} ₽)"
+                )
+            else:
+                selected_plan_label = f"id={survey.selected_plan_id} (неактивен)"
         lines.append(
-            f"• user <code>{survey.user_id}</code>, анкета <code>{survey.id}</code>, скидка {total}%"
+            f"• user <b>{username}</b>, анкета <code>{survey.id}</code>, "
+            f"тариф: <b>{selected_plan_label}</b>, скидка {total}%"
         )
         kb_rows.append(
             [
                 InlineKeyboardButton(
-                    text=f"Подтвердить для {survey.user_id}",
+                    text=f"Подтвердить для {username}",
                     callback_data=AdminCallback(
                         action=AdminAction.CONFIRM_PAYMENT, survey_id=survey.id
                     ).pack(),
@@ -352,11 +477,17 @@ async def confirm_payment(callback: CallbackQuery, callback_data: AdminCallback)
         await callback.answer("Анкета не найдена.", show_alert=True)
         return
 
+    users_map = await _users_display_map([survey.user_id])
+    username = _fallback_user_label(survey.user_id, users_map)
     plans = await payment_manager.get_payment_plans()
+    if not plans:
+        await callback.answer("Нет активных тарифных планов.", show_alert=True)
+        return
+
+    if plan_id is None and survey.selected_plan_id is not None:
+        plan_id = survey.selected_plan_id
+
     if plan_id is None:
-        if not plans:
-            await callback.answer("Нет активных тарифных планов.", show_alert=True)
-            return
         kb = InlineKeyboardMarkup(
             inline_keyboard=[
                 [
@@ -373,7 +504,7 @@ async def confirm_payment(callback: CallbackQuery, callback_data: AdminCallback)
             ]
         )
         await callback.message.edit_text(
-            f"Выберите тариф для user <code>{survey.user_id}</code> (анкета {survey_id}):",
+            f"Выберите тариф для user <b>{username}</b> (анкета {survey_id}):",
             reply_markup=kb,
         )
         await callback.answer()
@@ -419,12 +550,30 @@ async def confirm_payment(callback: CallbackQuery, callback_data: AdminCallback)
     try:
         bot: Bot = callback.message.bot
         await bot.send_message(chat_id=survey.user_id, text=text)
+        invite_link = await _create_personal_join_link(bot, survey.user_id)
+        if invite_link:
+            await bot.send_message(
+                chat_id=survey.user_id,
+                text=(
+                    "Ссылка для вступления в беседу:\n"
+                    f"{invite_link}\n\n"
+                    "После запроса бот автоматически подтвердит вход при активной подписке."
+                ),
+            )
+        else:
+            await bot.send_message(
+                chat_id=survey.user_id,
+                text=(
+                    "Не удалось сформировать новую ссылку в беседу автоматически.\n"
+                    "Напишите администратору для ручной выдачи доступа."
+                ),
+            )
     except Exception as exc:
         logger.error("Failed to send payment confirmation to %s: %s", survey.user_id, exc)
 
     await callback.message.edit_text(
         "Платеж подтвержден.\n"
-        f"user <code>{survey.user_id}</code>, тариф: {plan.name}, "
+        f"user <b>{username}</b>, тариф: {plan.name}, "
         f"скидка: {total_discount}%, цена: {final_price:.2f} ₽",
         reply_markup=back_to_main_inline_keyboard,
     )
@@ -635,10 +784,16 @@ async def list_admins(callback: CallbackQuery):
         await callback.answer()
         return
 
+    users_map = await _users_display_map([admin.id for admin in admins])
     lines = ["<b>Администраторы системы:</b>\n"]
     for admin in admins:
         role = "Супер-админ" if admin.is_super_admin else "Админ"
-        lines.append(f"{role}: <code>{admin.id}</code>")
+        username = (
+            f"@{admin.username}"
+            if admin.username
+            else _fallback_user_label(admin.id, users_map)
+        )
+        lines.append(f"{role}: <b>{username}</b>")
     await callback.message.edit_text(
         "\n".join(lines), reply_markup=back_to_main_inline_keyboard
     )
@@ -661,11 +816,13 @@ async def add_admin_process(message: Message, state: FSMContext):
         return
 
     success = await admin_manager.add_admin(admin_id, is_super_admin=False)
+    users_map = await _users_display_map([admin_id])
+    username = _fallback_user_label(admin_id, users_map)
     await message.answer(
         (
-            f"Админ {admin_id} добавлен."
+            f"Админ {username} добавлен."
             if success
-            else f"Админ {admin_id} уже существует."
+            else f"Админ {username} уже существует."
         ),
         reply_markup=back_to_main_inline_keyboard,
     )
@@ -687,9 +844,11 @@ async def remove_admin_process(message: Message, state: FSMContext):
         await message.answer("Некорректный ID.")
         return
 
+    users_map = await _users_display_map([admin_id])
+    username = _fallback_user_label(admin_id, users_map)
     success = await admin_manager.remove_admin(admin_id)
     await message.answer(
-        f"Админ {admin_id} удален." if success else f"Админ {admin_id} не найден.",
+        f"Админ {username} удален." if success else f"Админ {username} не найден.",
         reply_markup=back_to_main_inline_keyboard,
     )
     await state.clear()
@@ -791,3 +950,4 @@ async def create_plan_process(message: Message, state: FSMContext):
 
 
 moderation_router.include_router(super_admin_router)
+

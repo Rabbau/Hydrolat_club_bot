@@ -1,10 +1,11 @@
-import logging
+﻿import logging
 import os
 
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, ChatJoinRequest, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from src.FormManager.FormManager import FormManager
 from src.db_components.models import BotMessageType, SurveyStatusEnum
@@ -42,6 +43,26 @@ def _parse_env_int(value: str | None) -> int | None:
         return None
 
 
+def _parse_env_int_set(value: str | None) -> set[int]:
+    if not value:
+        return set()
+    result: set[int] = set()
+    for part in value.split(","):
+        parsed = _parse_env_int(part)
+        if parsed is not None:
+            result.add(parsed)
+    return result
+
+
+def _get_target_chat_ids() -> set[int]:
+    chat_ids: set[int] = set()
+    single_chat_id = _parse_env_int(os.getenv("GROUP_CHAT_ID"))
+    if single_chat_id is not None:
+        chat_ids.add(single_chat_id)
+    chat_ids.update(_parse_env_int_set(os.getenv("GROUP_CHAT_IDS")))
+    return chat_ids
+
+
 async def _is_admin_or_super_admin(user_id: int) -> bool:
     admin_id = _parse_env_int(os.getenv("ADMIN_ID"))
     super_admin_id = _parse_env_int(os.getenv("SUPER_ADMIN_ID"))
@@ -54,6 +75,34 @@ async def _is_admin_or_super_admin(user_id: int) -> bool:
 
 async def _status_keyboard_for_user(user_id: int):
     return admin_status_kb if await _is_admin_or_super_admin(user_id) else status_kb
+
+
+@user_router.chat_join_request()
+async def auto_approve_join_request(join_request: ChatJoinRequest):
+    target_chat_ids = _get_target_chat_ids()
+    if target_chat_ids and join_request.chat.id not in target_chat_ids:
+        return
+
+    user_id = join_request.from_user.id
+    subscription = await payment_manager.get_user_subscription(user_id)
+    if not subscription:
+        await join_request.bot.decline_chat_join_request(
+            chat_id=join_request.chat.id,
+            user_id=user_id,
+        )
+        try:
+            await join_request.bot.send_message(
+                chat_id=user_id,
+                text="Вход отклонен: активная подписка не найдена.",
+            )
+        except Exception:
+            pass
+        return
+
+    await join_request.bot.approve_chat_join_request(
+        chat_id=join_request.chat.id,
+        user_id=user_id,
+    )
 
 
 async def _start_survey_flow(
@@ -195,6 +244,107 @@ async def start_filling_survey(
     await callback.answer()
 
 
+@user_router.callback_query(
+    UserCallback.filter(F.action == UserAction.RENEW_SUBSCRIPTION_SELECT_PLAN)
+)
+async def select_renewal_plan(callback: CallbackQuery, callback_data: UserCallback):
+    user_id = callback.from_user.id
+    plan_id = callback_data.plan_id
+    logger.info("Renewal plan click: user_id=%s, plan_id=%s", user_id, plan_id)
+
+    try:
+        if plan_id is None:
+            await callback.answer("Тариф не выбран.", show_alert=True)
+            await callback.message.answer("Не удалось определить выбранный тариф.")
+            return
+
+        subscription = await payment_manager.get_latest_subscription_for_renewal(user_id)
+        if not subscription:
+            await callback.answer(
+                "Подписка для продления не найдена. Обратитесь к администратору.",
+                show_alert=True,
+            )
+            await callback.message.answer(
+                "Продление недоступно: подписка для продления не найдена."
+            )
+            return
+
+        plans = await payment_manager.get_payment_plans()
+        plan = next((p for p in plans if p.id == plan_id), None)
+        if not plan:
+            await callback.answer("Тариф больше недоступен.", show_alert=True)
+            await callback.message.answer("Этот тариф больше недоступен. Выберите другой.")
+            return
+
+        request = await survey_manager.create_or_update_renewal_payment_request(
+            user_id=user_id,
+            plan_id=plan_id,
+        )
+        if not request:
+            await callback.answer("Не удалось создать заявку на продление.", show_alert=True)
+            await callback.message.answer(
+                "Не удалось создать заявку на продление. Если у вас уже есть ожидающая заявка на оплату, дождитесь решения администратора."
+            )
+            return
+
+        confirmation_text = (
+            "Заявка на продление создана.\n\n"
+            f"Выбран тариф: <b>{plan.name}</b> ({plan.duration_days} дн., {plan.price:.2f} ₽).\n"
+            "После оплаты администратор подтвердит продление подписки."
+        )
+        try:
+            await callback.message.edit_text(confirmation_text)
+        except TelegramBadRequest:
+            await callback.message.answer(confirmation_text)
+        await callback.answer("Тариф выбран")
+    except Exception as exc:
+        logger.exception(
+            "Renewal plan processing failed for user_id=%s plan_id=%s: %s",
+            user_id,
+            plan_id,
+            exc,
+        )
+        await callback.answer("Ошибка обработки. Попробуйте еще раз.", show_alert=True)
+        await callback.message.answer(
+            "Произошла ошибка при обработке продления. Администратор уже может увидеть детали в логах."
+        )
+
+
+@user_router.callback_query(
+    UserCallback.filter(F.action == UserAction.APPROVED_SURVEY_SELECT_PLAN)
+)
+async def select_approved_survey_plan(callback: CallbackQuery, callback_data: UserCallback):
+    user_id = callback.from_user.id
+    plan_id = callback_data.plan_id
+    if plan_id is None:
+        await callback.answer("Тариф не выбран.", show_alert=True)
+        return
+
+    plans = await payment_manager.get_payment_plans()
+    plan = next((p for p in plans if p.id == plan_id), None)
+    if not plan:
+        await callback.answer("Тариф больше недоступен.", show_alert=True)
+        return
+
+    survey = await survey_manager.set_selected_plan_for_pending_payment(
+        user_id=user_id,
+        plan_id=plan_id,
+    )
+    if not survey:
+        await callback.answer(
+            "Нет одобренной анкеты, ожидающей оплату.",
+            show_alert=True,
+        )
+        return
+
+    await callback.message.edit_text(
+        "Тариф для оплаты выбран.\n\n"
+        f"Выбрано: <b>{plan.name}</b> ({plan.duration_days} дн., {plan.price:.2f} ₽).\n"
+        "Теперь выполните оплату и дождитесь подтверждения администратора."
+    )
+    await callback.answer("Тариф выбран")
+
+
 @user_router.message(F.text == "Анкета")
 async def restart_survey_from_menu(
     message: Message,
@@ -231,7 +381,7 @@ async def restart_survey_from_menu(
 async def survey_and_subscription_status(message: Message):
     user_id = message.from_user.id
     survey = await survey_manager.get_latest_survey(user_id)
-    subscription = await payment_manager.get_user_subscription(user_id)
+    subscription = await payment_manager.get_latest_subscription_for_renewal(user_id)
     parts: list[str] = []
 
     if not survey:
@@ -350,3 +500,4 @@ async def survey_yes_no(
         form=form,
     )
     await callback.answer()
+
