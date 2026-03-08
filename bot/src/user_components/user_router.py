@@ -12,6 +12,7 @@ from src.db_components.models import BotMessageType, SurveyStatusEnum
 from src.db_components.survey_manager import (
     admin_manager,
     bot_message_manager,
+    bot_settings_manager,
     payment_manager,
     survey_manager,
 )
@@ -54,20 +55,26 @@ def _parse_env_int_set(value: str | None) -> set[int]:
     return result
 
 
-def _get_target_chat_ids() -> set[int]:
-    chat_ids: set[int] = set()
+async def _get_target_chat_ids() -> set[int]:
+    chat_ids = await bot_settings_manager.get_group_chat_ids()
+    if chat_ids:
+        return chat_ids
+
+    out: set[int] = set()
     single_chat_id = _parse_env_int(os.getenv("GROUP_CHAT_ID"))
     if single_chat_id is not None:
-        chat_ids.add(single_chat_id)
-    chat_ids.update(_parse_env_int_set(os.getenv("GROUP_CHAT_IDS")))
-    return chat_ids
+        out.add(single_chat_id)
+    out.update(_parse_env_int_set(os.getenv("GROUP_CHAT_IDS")))
+    return out
 
 
 async def _is_admin_or_super_admin(user_id: int) -> bool:
     admin_id = _parse_env_int(os.getenv("ADMIN_ID"))
     super_admin_id = _parse_env_int(os.getenv("SUPER_ADMIN_ID"))
+    super_admin_ids = _parse_env_int_set(os.getenv("SUPER_ADMIN_IDS"))
     if (admin_id is not None and user_id == admin_id) or (
-        super_admin_id is not None and user_id == super_admin_id
+        (super_admin_id is not None and user_id == super_admin_id)
+        or (user_id in super_admin_ids)
     ):
         return True
     return await admin_manager.is_admin(user_id)
@@ -77,9 +84,19 @@ async def _status_keyboard_for_user(user_id: int):
     return admin_status_kb if await _is_admin_or_super_admin(user_id) else status_kb
 
 
+@user_router.message(F.text == "!id")
+async def show_chat_id(message: Message):
+    # Useful for setup: add bot to a group/supergroup, send "!id" to get chat_id.
+    if message.chat.type not in ("group", "supergroup"):
+        await message.answer("Эта команда работает только в группе/супергруппе.")
+        return
+
+    await message.answer(f"ID этого чата: {message.chat.id}")
+
+
 @user_router.chat_join_request()
 async def auto_approve_join_request(join_request: ChatJoinRequest):
-    target_chat_ids = _get_target_chat_ids()
+    target_chat_ids = await _get_target_chat_ids()
     if target_chat_ids and join_request.chat.id not in target_chat_ids:
         return
 
@@ -189,6 +206,15 @@ async def handler_answers_survey(
         logger.error("Не удалось сохранить ответ пользователя %s", user_id)
         return
 
+    # For inline yes/no questions we should not "replace" the question message with the next
+    # question via edit_text, otherwise the previous question disappears from chat history.
+    # Instead, freeze the current question (remove keyboard) and send next question as a new message.
+    if isinstance(event, CallbackQuery):
+        try:
+            await event.message.edit_reply_markup(reply_markup=None)
+        except TelegramBadRequest:
+            pass
+
     if question_id >= total:
         answers = await users.get_answers(user_id)
         if answers:
@@ -202,7 +228,7 @@ async def handler_answers_survey(
         if isinstance(event, Message):
             await event.answer(text_done, reply_markup=user_status_kb)
         else:
-            await event.message.edit_text(text_done)
+            await event.message.answer(text_done, reply_markup=user_status_kb)
         await state.clear()
         return
 
@@ -218,7 +244,7 @@ async def handler_answers_survey(
     if isinstance(event, Message):
         await event.answer(text, reply_markup=kb)
     else:
-        await event.message.edit_text(text, reply_markup=kb)
+        await event.message.answer(text, reply_markup=kb)
 
 
 @user_router.callback_query(UserCallback.filter(F.action == UserAction.FILL_SURVEY))
@@ -313,7 +339,11 @@ async def select_renewal_plan(callback: CallbackQuery, callback_data: UserCallba
 @user_router.callback_query(
     UserCallback.filter(F.action == UserAction.APPROVED_SURVEY_SELECT_PLAN)
 )
-async def select_approved_survey_plan(callback: CallbackQuery, callback_data: UserCallback):
+async def select_approved_survey_plan(
+    callback: CallbackQuery,
+    callback_data: UserCallback,
+    state: FSMContext,
+):
     user_id = callback.from_user.id
     plan_id = callback_data.plan_id
     if plan_id is None:
@@ -338,11 +368,121 @@ async def select_approved_survey_plan(callback: CallbackQuery, callback_data: Us
         return
 
     await callback.message.edit_text(
-        "Тариф для оплаты выбран.\n\n"
-        f"Выбрано: <b>{plan.name}</b> ({plan.duration_days} дн., {plan.price:.2f} ₽).\n"
-        "Теперь выполните оплату и дождитесь подтверждения администратора."
+        "Тариф выбран.\n\n"
+        f"Выбрано: <b>{plan.name}</b> ({plan.duration_days} дн., {plan.price:.2f} ₽).\n\n"
+        "Если у вас есть промокод, отправьте его одним сообщением.\n"
+        "Если промокода нет, нажмите «Далее без промокода».",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="Далее без промокода",
+                        callback_data=UserCallback(
+                            action=UserAction.APPROVED_SURVEY_SKIP_PROMO
+                        ).pack(),
+                    )
+                ]
+            ]
+        ),
     )
+    await state.set_state(UserFSM.waiting_payment_promo_code)
     await callback.answer("Тариф выбран")
+
+
+async def _payment_summary_for_user(user_id: int) -> tuple[str, InlineKeyboardMarkup] | None:
+    survey = await survey_manager.get_latest_pending_payment_survey(user_id)
+    if not survey or survey.selected_plan_id is None:
+        return None
+
+    plans = await payment_manager.get_payment_plans()
+    plan = next((p for p in plans if p.id == survey.selected_plan_id), None)
+    if not plan:
+        return None
+
+    personal = int(survey.personal_discount or 0)
+    promo = int(survey.promo_discount or 0)
+    total_discount = min(100, personal + promo)
+    final_price = plan.price * (100 - total_discount) / 100
+
+    lines = [
+        "<b>Проверка оплаты</b>",
+        "",
+        f"Тариф: <b>{plan.name}</b>",
+        f"Цена: <b>{plan.price:.2f} ₽</b>",
+        f"Скидка персональная: <b>{personal}%</b>",
+        f"Скидка по промокоду: <b>{promo}%</b>",
+        f"Итого скидка: <b>{total_discount}%</b>",
+        f"К оплате: <b>{final_price:.2f} ₽</b>",
+        "",
+        "Нажмите «Оплатить», чтобы получить реквизиты.",
+    ]
+
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Оплатить",
+                    callback_data=UserCallback(action=UserAction.APPROVED_SURVEY_PAY).pack(),
+                )
+            ]
+        ]
+    )
+    return "\n".join(lines), kb
+
+
+@user_router.callback_query(
+    UserCallback.filter(F.action == UserAction.APPROVED_SURVEY_SKIP_PROMO)
+)
+async def approved_survey_skip_promo(callback: CallbackQuery, state: FSMContext):
+    summary = await _payment_summary_for_user(callback.from_user.id)
+    if not summary:
+        await callback.answer(
+            "Не удалось подготовить оплату. Выберите тариф заново.",
+            show_alert=True,
+        )
+        await callback.message.answer(
+            "Не удалось подготовить оплату. Попробуйте выбрать тариф снова."
+        )
+        await state.clear()
+        return
+    text, kb = summary
+    await callback.message.answer(text, reply_markup=kb)
+    await state.clear()
+    await callback.answer()
+
+
+@user_router.callback_query(UserCallback.filter(F.action == UserAction.APPROVED_SURVEY_PAY))
+async def approved_survey_pay(callback: CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
+    survey = await survey_manager.get_latest_pending_payment_survey(user_id)
+    if not survey or survey.selected_plan_id is None:
+        await callback.answer("Нет заявки на оплату.", show_alert=True)
+        return
+    await survey_manager.mark_user_payment_started(user_id)
+
+    plans = await payment_manager.get_payment_plans()
+    plan = next((p for p in plans if p.id == survey.selected_plan_id), None)
+    if not plan:
+        await callback.answer("Тариф больше недоступен.", show_alert=True)
+        return
+
+    personal = int(survey.personal_discount or 0)
+    promo = int(survey.promo_discount or 0)
+    total_discount = min(100, personal + promo)
+    final_price = plan.price * (100 - total_discount) / 100
+
+    payment_details = await bot_message_manager.get_message(BotMessageType.PAYMENT_DETAILS)
+    details_text = (
+        payment_details.content
+        if payment_details
+        else "Реквизиты для оплаты не настроены. Напишите администратору."
+    )
+    await callback.message.answer(
+        f"<b>К оплате: {final_price:.2f} ₽</b>\n\n{details_text}\n\n"
+        "После оплаты администратор подтвердит платеж, и вы получите доступ."
+    )
+    await state.clear()
+    await callback.answer()
 
 
 @user_router.message(F.text == "Анкета")
@@ -463,6 +603,68 @@ async def promo_code_process(message: Message, state: FSMContext):
 
     user_status_kb = await _status_keyboard_for_user(message.from_user.id)
     await message.answer(reply, reply_markup=user_status_kb)
+    await state.clear()
+
+
+@user_router.message(UserFSM.waiting_payment_promo_code)
+async def payment_promo_code_process(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    code = (message.text or "").strip()
+    if not code:
+        await message.answer(
+            "Введите промокод одним сообщением или нажмите «Далее без промокода».",
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Далее без промокода",
+                            callback_data=UserCallback(
+                                action=UserAction.APPROVED_SURVEY_SKIP_PROMO
+                            ).pack(),
+                        )
+                    ]
+                ]
+            ),
+        )
+        return
+
+    ok, text, _discount = await survey_manager.apply_promo_code_to_pending_payment_survey(
+        user_id, code
+    )
+    if not ok:
+        invalid_template = await _get_message_text(
+            BotMessageType.PROMO_INVALID, "Промокод не применен: {text}"
+        )
+        reply = invalid_template.replace("{text}", text)
+        await message.answer(
+            reply + "\n\nОтправьте другой промокод или нажмите «Далее без промокода».",
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Далее без промокода",
+                            callback_data=UserCallback(
+                                action=UserAction.APPROVED_SURVEY_SKIP_PROMO
+                            ).pack(),
+                        )
+                    ]
+                ]
+            ),
+        )
+        return
+
+    applied_template = await _get_message_text(
+        BotMessageType.PROMO_APPLIED, "Промокод применен: {text}"
+    )
+    await message.answer(applied_template.replace("{text}", text))
+
+    summary = await _payment_summary_for_user(user_id)
+    if not summary:
+        await message.answer("Не удалось посчитать сумму. Напишите администратору.")
+        await state.clear()
+        return
+    summary_text, kb = summary
+    await message.answer(summary_text, reply_markup=kb)
     await state.clear()
 
 

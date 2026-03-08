@@ -16,6 +16,17 @@ def _parse_env_int(value: str | None) -> int | None:
         return None
 
 
+def _parse_env_int_set(value: str | None) -> set[int]:
+    if not value:
+        return set()
+    result: set[int] = set()
+    for part in value.split(","):
+        parsed = _parse_env_int(part)
+        if parsed is not None:
+            result.add(parsed)
+    return result
+
+
 async def show_admin_main_menu(callback_or_message: CallbackQuery | Message):
     text, keyboard = "Админ-панель:", kb.admin_main_menu_inline_keyboard
     if isinstance(callback_or_message, CallbackQuery):
@@ -38,7 +49,10 @@ async def show_super_admin_menu(callback_or_message: CallbackQuery | Message):
     user = callback_or_message.from_user
 
     super_admin_id = _parse_env_int(os.getenv("SUPER_ADMIN_ID"))
-    is_env_super_admin = super_admin_id is not None and user.id == super_admin_id
+    super_admin_ids = _parse_env_int_set(os.getenv("SUPER_ADMIN_IDS"))
+    is_env_super_admin = (super_admin_id is not None and user.id == super_admin_id) or (
+        user.id in super_admin_ids
+    )
     is_db_super_admin = await admin_manager.is_super_admin(user.id)
 
     if not (is_env_super_admin or is_db_super_admin):

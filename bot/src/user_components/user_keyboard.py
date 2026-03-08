@@ -43,7 +43,6 @@ user_survey_check_status = ReplyKeyboardMarkup(
         [
             KeyboardButton(text="Анкета"),
             KeyboardButton(text="Статус профиля"),
-            KeyboardButton(text="Промокод"),
             KeyboardButton(text="Тарифы"),
         ],
     ],
@@ -57,7 +56,6 @@ admin_survey_check_status = ReplyKeyboardMarkup(
         [
             KeyboardButton(text="Админка"),
             KeyboardButton(text="Статус профиля"),
-            KeyboardButton(text="Промокод"),
             KeyboardButton(text="Тарифы"),
         ],
     ],

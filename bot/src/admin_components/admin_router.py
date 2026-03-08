@@ -7,7 +7,10 @@ from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMar
 from src.FormManager.FormManager import FormManager
 from src.admin_components.admin_callbacks import AdminAction, AdminCallback
 from src.admin_components.admin_filter import AdminFilter
-from src.admin_components.admin_keyboards import back_to_main_inline_keyboard
+from src.admin_components.admin_keyboards import (
+    back_to_main_inline_keyboard,
+    back_to_statistics_and_menu_inline_keyboard,
+)
 from src.admin_components.admin_utils import (
     show_admin_main_menu,
     show_moderation_menu,
@@ -116,7 +119,11 @@ async def statistics_menu(callback: CallbackQuery):
                 InlineKeyboardButton(
                     text="Назад",
                     callback_data=AdminCallback(action=AdminAction.SURVEY_BACK).pack(),
-                )
+                ),
+                InlineKeyboardButton(
+                    text="В меню",
+                    callback_data=AdminCallback(action=AdminAction.SURVEY_BACK).pack(),
+                ),
             ],
         ]
     )
@@ -145,7 +152,7 @@ async def statistics_users_list(callback: CallbackQuery):
     users = await user_manager.get_all_users_with_info()
     if not users:
         await callback.message.edit_text(
-            "Пользователи не найдены.", reply_markup=back_to_main_inline_keyboard
+            "Пользователи не найдены.", reply_markup=back_to_statistics_and_menu_inline_keyboard
         )
         await callback.answer()
         return
@@ -163,7 +170,7 @@ async def statistics_users_list(callback: CallbackQuery):
             )
 
     await callback.message.edit_text(
-        "\n".join(lines), reply_markup=back_to_main_inline_keyboard
+        "\n".join(lines), reply_markup=back_to_statistics_and_menu_inline_keyboard
     )
     await callback.answer()
 
@@ -174,7 +181,7 @@ async def _show_survey_status_list(
     surveys = await survey_manager.get_surveys_by_status(status)
     if not surveys:
         await callback.message.edit_text(
-            f"{title}: пусто.", reply_markup=back_to_main_inline_keyboard
+            f"{title}: пусто.", reply_markup=back_to_statistics_and_menu_inline_keyboard
         )
         await callback.answer()
         return
@@ -187,7 +194,7 @@ async def _show_survey_status_list(
         )
         lines.append(f"• {user_label}, анкета <code>{survey.id}</code>")
     await callback.message.edit_text(
-        "\n".join(lines), reply_markup=back_to_main_inline_keyboard
+        "\n".join(lines), reply_markup=back_to_statistics_and_menu_inline_keyboard
     )
     await callback.answer()
 
@@ -219,7 +226,7 @@ async def statistics_active_subscriptions_list(callback: CallbackQuery):
     active_subscriptions = await payment_manager.get_active_subscriptions()
     if not active_subscriptions:
         await callback.message.edit_text(
-            "Активные подписки не найдены.", reply_markup=back_to_main_inline_keyboard
+            "Активные подписки не найдены.", reply_markup=back_to_statistics_and_menu_inline_keyboard
         )
         await callback.answer()
         return
@@ -238,7 +245,7 @@ async def statistics_active_subscriptions_list(callback: CallbackQuery):
             f"• {user_label}, тариф <b>{html.escape(plan_name)}</b>, до {sub.end_date.strftime('%d.%m.%Y')}"
         )
     await callback.message.edit_text(
-        "\n".join(lines), reply_markup=back_to_main_inline_keyboard
+        "\n".join(lines), reply_markup=back_to_statistics_and_menu_inline_keyboard
     )
     await callback.answer()
 

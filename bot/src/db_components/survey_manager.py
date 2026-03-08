@@ -9,6 +9,7 @@ from .models import (
     AdminUser,
     BotMessage,
     BotMessageType,
+    BotSetting,
     PaymentPlan,
     PromoCode,
     Subscription,
@@ -110,6 +111,83 @@ class SurveyManager:
             f"Промокод применен: скидка {promo.discount_percent}%",
             promo.discount_percent,
         )
+
+    async def apply_promo_code_to_pending_payment_survey(
+        self, user_id: int, code: str
+    ) -> tuple[bool, str, int]:
+        promo = await promo_code_manager.validate_promo_code(code, user_id)
+        if not promo:
+            return False, "Промокод недействителен или недоступен", 0
+
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(SurveySubmission)
+                .where(
+                    and_(
+                        SurveySubmission.user_id == user_id,
+                        SurveySubmission.status == SurveyStatusEnum.PENDING_PAYMENT,
+                    )
+                )
+                .order_by(desc(SurveySubmission.created_at))
+            )
+            survey = result.scalars().first()
+            if not survey:
+                return False, "Нет анкеты, ожидающей оплату", 0
+
+            survey.promo_code_id = promo.id
+            survey.promo_discount = promo.discount_percent
+            survey.updated_at = datetime.utcnow()
+
+        return (
+            True,
+            f"Промокод применен: скидка {promo.discount_percent}%",
+            promo.discount_percent,
+        )
+
+    async def get_latest_pending_payment_survey(
+        self, user_id: int
+    ) -> Optional[SurveySubmission]:
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(SurveySubmission)
+                .where(
+                    and_(
+                        SurveySubmission.user_id == user_id,
+                        SurveySubmission.status == SurveyStatusEnum.PENDING_PAYMENT,
+                    )
+                )
+                .order_by(desc(SurveySubmission.created_at))
+            )
+            return result.scalars().first()
+
+    async def mark_user_payment_started(self, user_id: int) -> bool:
+        async with get_db_session() as session:
+            await session.execute(
+                text("SELECT pg_advisory_xact_lock(:lock_key)"),
+                {"lock_key": user_id},
+            )
+            result = await session.execute(
+                select(SurveySubmission)
+                .where(
+                    and_(
+                        SurveySubmission.user_id == user_id,
+                        SurveySubmission.status == SurveyStatusEnum.PENDING_PAYMENT,
+                    )
+                )
+                .order_by(desc(SurveySubmission.created_at))
+            )
+            target = result.scalars().first()
+            if not target:
+                return False
+
+            answers = dict(target.answers or {})
+            payment_flow = dict(answers.get("payment_flow") or {})
+            payment_flow["user_clicked_pay"] = True
+            payment_flow["user_clicked_pay_at"] = datetime.utcnow().isoformat()
+            answers["payment_flow"] = payment_flow
+            target.answers = answers
+            target.updated_at = datetime.utcnow()
+            return True
 
     async def get_status_counts(self) -> Dict[str, int]:
         async with get_db_session() as session:
@@ -214,8 +292,133 @@ class SurveyManager:
                 return None
 
             target.selected_plan_id = plan_id
+            answers = dict(target.answers or {})
+            payment_flow = dict(answers.get("payment_flow") or {})
+            payment_flow["plan_selected"] = True
+            payment_flow["admin_tariff_confirmed"] = False
+            payment_flow["admin_tariff_confirmed_by"] = None
+            payment_flow["admin_tariff_confirmed_at"] = None
+            answers["payment_flow"] = payment_flow
+            target.answers = answers
             target.updated_at = datetime.utcnow()
             return target
+
+    async def admin_set_selected_plan_for_survey(
+        self, survey_id: int, plan_id: int, admin_id: int
+    ) -> SurveySubmission | None:
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(SurveySubmission).where(SurveySubmission.id == survey_id)
+            )
+            target = result.scalar_one_or_none()
+            if not target:
+                return None
+            if target.status != SurveyStatusEnum.PENDING_PAYMENT:
+                return None
+
+            target.selected_plan_id = plan_id
+            answers = dict(target.answers or {})
+            payment_flow = dict(answers.get("payment_flow") or {})
+            payment_flow["plan_selected"] = True
+            payment_flow["admin_override_plan"] = True
+            payment_flow["admin_tariff_confirmed"] = False
+            payment_flow["admin_tariff_confirmed_by"] = None
+            payment_flow["admin_tariff_confirmed_at"] = None
+            payment_flow["admin_override_plan_by"] = admin_id
+            payment_flow["admin_override_plan_at"] = datetime.utcnow().isoformat()
+            answers["payment_flow"] = payment_flow
+            target.answers = answers
+            target.updated_at = datetime.utcnow()
+            return target
+
+    async def admin_confirm_tariff(self, survey_id: int, admin_id: int) -> bool:
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(SurveySubmission).where(SurveySubmission.id == survey_id)
+            )
+            target = result.scalar_one_or_none()
+            if not target:
+                return False
+            if target.status != SurveyStatusEnum.PENDING_PAYMENT:
+                return False
+            if target.selected_plan_id is None:
+                return False
+
+            answers = dict(target.answers or {})
+            payment_flow = dict(answers.get("payment_flow") or {})
+            payment_flow["admin_tariff_confirmed"] = True
+            payment_flow["admin_tariff_confirmed_by"] = admin_id
+            payment_flow["admin_tariff_confirmed_at"] = datetime.utcnow().isoformat()
+            answers["payment_flow"] = payment_flow
+            target.answers = answers
+            target.updated_at = datetime.utcnow()
+            return True
+
+
+class BotSettingsManager:
+    KEY_GROUP_CHAT_ID = "group_chat_id"
+    KEY_GROUP_CHAT_IDS = "group_chat_ids"
+
+    @staticmethod
+    def _parse_int(value: str | None) -> int | None:
+        if value is None:
+            return None
+        cleaned = value.strip().strip("\"'")
+        try:
+            return int(cleaned)
+        except ValueError:
+            return None
+
+    @classmethod
+    def _parse_int_set(cls, value: str | None) -> set[int]:
+        if not value:
+            return set()
+        result: set[int] = set()
+        for part in value.split(","):
+            parsed = cls._parse_int(part)
+            if parsed is not None:
+                result.add(parsed)
+        return result
+
+    async def get_setting(self, key: str) -> str | None:
+        async with get_db_session() as session:
+            result = await session.execute(select(BotSetting).where(BotSetting.key == key))
+            row = result.scalar_one_or_none()
+            return row.value if row else None
+
+    async def set_setting(self, key: str, value: str) -> None:
+        async with get_db_session() as session:
+            result = await session.execute(select(BotSetting).where(BotSetting.key == key))
+            row = result.scalar_one_or_none()
+            if row:
+                row.value = value
+                row.updated_at = datetime.utcnow()
+            else:
+                session.add(BotSetting(key=key, value=value))
+
+    async def delete_setting(self, key: str) -> None:
+        async with get_db_session() as session:
+            result = await session.execute(select(BotSetting).where(BotSetting.key == key))
+            row = result.scalar_one_or_none()
+            if row:
+                await session.delete(row)
+
+    async def get_group_chat_ids(self) -> set[int]:
+        single = self._parse_int(await self.get_setting(self.KEY_GROUP_CHAT_ID))
+        multiple = self._parse_int_set(await self.get_setting(self.KEY_GROUP_CHAT_IDS))
+        out: set[int] = set()
+        if single is not None:
+            out.add(single)
+        out.update(multiple)
+        return out
+
+    async def set_group_chat_id(self, chat_id: int) -> None:
+        await self.set_setting(self.KEY_GROUP_CHAT_ID, str(chat_id))
+        await self.delete_setting(self.KEY_GROUP_CHAT_IDS)
+
+    async def clear_group_chat_ids(self) -> None:
+        await self.delete_setting(self.KEY_GROUP_CHAT_ID)
+        await self.delete_setting(self.KEY_GROUP_CHAT_IDS)
 
 
 class PaymentManager:
@@ -433,6 +636,14 @@ class PaymentManager:
 
 
 class PromoCodeManager:
+    async def list_promo_codes(self, include_inactive: bool = True) -> List[PromoCode]:
+        async with get_db_session() as session:
+            stmt = select(PromoCode).order_by(desc(PromoCode.created_at))
+            if not include_inactive:
+                stmt = stmt.where(PromoCode.is_active == True)
+            result = await session.execute(stmt)
+            return result.scalars().all()
+
     async def create_promo_code(
         self,
         code: str,
@@ -497,6 +708,17 @@ class PromoCodeManager:
         async with get_db_session() as session:
             result = await session.execute(
                 select(PromoCode).where(PromoCode.code == code.upper())
+            )
+            promo = result.scalar_one_or_none()
+            if not promo:
+                return False
+            promo.is_active = False
+            return True
+
+    async def delete_promo_code_by_id(self, promo_code_id: int) -> bool:
+        async with get_db_session() as session:
+            result = await session.execute(
+                select(PromoCode).where(PromoCode.id == promo_code_id)
             )
             promo = result.scalar_one_or_none()
             if not promo:
@@ -665,4 +887,5 @@ payment_manager = PaymentManager()
 promo_code_manager = PromoCodeManager()
 admin_manager = AdminManager()
 bot_message_manager = BotMessageManager()
+bot_settings_manager = BotSettingsManager()
 

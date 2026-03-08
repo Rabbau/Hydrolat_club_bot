@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>Gidrolat — Руководство пользователя</title>
+
+<style>
+
+:root{
+--bg:#0b1220;
+--panel:#0f1a30;
+--text:#e8eefc;
+--muted:#b5c3e6;
+--border:rgba(255,255,255,0.12);
+--accent:#79a6ff;
+--accent2:#6ee7ff;
+--codebg:rgba(255,255,255,0.06);
+--shadow:0 10px 40px rgba(0,0,0,.35);
+}
+
+html{
+scroll-behavior:smooth;
+}
+
+body{
+margin:0;
+background:
+radial-gradient(1200px 800px at 20% 0%,rgba(121,166,255,.25),transparent 60%),
+radial-gradient(1000px 700px at 100% 20%,rgba(110,231,255,.18),transparent 55%),
+var(--bg);
+color:var(--text);
+font:15px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,Arial;
+}
+
+a{
+color:var(--accent2);
+text-decoration:none;
+}
+
+a:hover{
+text-decoration:underline;
+}
+
+/* HEADER (mobile) */
+
+.header{
+display:none;
+align-items:center;
+justify-content:space-between;
+padding:12px 14px;
+border-bottom:1px solid var(--border);
+position:sticky;
+top:0;
+background:rgba(11,18,32,.85);
+backdrop-filter:blur(10px);
+z-index:10;
+}
+
+.burger{
+font-size:22px;
+cursor:pointer;
+}
+
+/* LAYOUT */
+
+.layout{
+display:grid;
+grid-template-columns:300px 1fr;
+gap:18px;
+max-width:1200px;
+margin:auto;
+padding:20px;
+}
+
+.sidebar{
+position:sticky;
+top:18px;
+align-self:start;
+background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.04));
+border:1px solid var(--border);
+border-radius:14px;
+padding:16px;
+box-shadow:var(--shadow);
+backdrop-filter:blur(10px);
+height:max-content;
+}
+
+.brand{
+display:flex;
+gap:10px;
+align-items:center;
+margin-bottom:10px;
+}
+
+.logo{
+width:36px;
+height:36px;
+border-radius:10px;
+background:linear-gradient(135deg,#79a6ff,#6ee7ff);
+}
+
+.brand h1{
+font-size:15px;
+margin:0;
+}
+
+.sub{
+display:block;
+font-size:12px;
+color:var(--muted);
+}
+
+.meta{
+font-size:13px;
+color:var(--muted);
+margin-bottom:12px;
+}
+
+.toc{
+list-style:none;
+padding:0;
+margin:0;
+}
+
+.toc a{
+display:block;
+padding:8px 10px;
+border-radius:8px;
+color:var(--text);
+}
+
+.toc a:hover{
+background:rgba(255,255,255,.05);
+}
+
+/* CONTENT */
+
+.content{
+background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));
+border:1px solid var(--border);
+border-radius:14px;
+padding:20px;
+box-shadow:var(--shadow);
+}
+
+h2{
+margin-top:20px;
+}
+
+h3{
+margin-top:18px;
+}
+
+ul{
+margin-left:18px;
+}
+
+.grid{
+display:grid;
+grid-template-columns:repeat(2,1fr);
+gap:12px;
+}
+
+.card{
+background:rgba(255,255,255,.04);
+border:1px solid rgba(255,255,255,.12);
+border-radius:12px;
+padding:12px;
+}
+
+.card h4{
+margin:0 0 6px;
+font-size:14px;
+}
+
+.card p{
+margin:0;
+font-size:13px;
+color:var(--muted);
+}
+
+code{
+background:var(--codebg);
+padding:2px 5px;
+border-radius:6px;
+cursor:pointer;
+}
+
+pre{
+background:var(--codebg);
+padding:12px;
+border-radius:10px;
+overflow:auto;
+}
+
+.footer{
+margin-top:24px;
+padding-top:12px;
+border-top:1px solid var(--border);
+font-size:12px;
+color:var(--muted);
+}
+
+/* MOBILE */
+
+@media(max-width:900px){
+
+.header{
+display:flex;
+}
+
+.layout{
+grid-template-columns:1fr;
+padding:12px;
+}
+
+.sidebar{
+position:fixed;
+left:-280px;
+top:0;
+height:100%;
+width:260px;
+border-radius:0;
+transition:.3s;
+z-index:20;
+}
+
+.sidebar.open{
+left:0;
+}
+
+.grid{
+grid-template-columns:1fr;
+}
+
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="header">
+<div>Gidrolat</div>
+<div class="burger" onclick="toggleMenu()">☰</div>
+</div>
+
+<div class="layout">
+
+<aside class="sidebar" id="sidebar">
+
+<div class="brand">
+<div class="logo"></div>
+<div>
+<h1>Gidrolat <span class="sub">Руководство</span></h1>
+</div>
+</div>
+
+<div class="meta">
+Один HTML файл для команды
+</div>
+
+<ul class="toc">
+<li><a href="#overview">Обзор</a></li>
+<li><a href="#quickstart">Быстрый старт</a></li>
+<li><a href="#roles">Роли</a></li>
+<li><a href="#user">Пользователь</a></li>
+<li><a href="#admin">Администратор</a></li>
+<li><a href="#superadmin">Супер-админ</a></li>
+<li><a href="#faq">FAQ</a></li>
+</ul>
+
+</aside>
+
+<main class="content">
+
+<h2 id="overview">Обзор</h2>
+
+<p>
+Telegram-бот <strong>Gidrolat</strong> предназначен для приема анкет,
+модерации, управления тарифами и подтверждения оплат.
+</p>
+
+<h2 id="quickstart">Быстрый старт</h2>
+
+<div class="grid">
+
+<div class="card">
+<h4>Пользователь</h4>
+<p>/start → заполнить анкету → выбрать тариф</p>
+</div>
+
+<div class="card">
+<h4>Администратор</h4>
+<p>/admin → модерация анкет → подтверждение оплат</p>
+</div>
+
+<div class="card">
+<h4>Супер-админ</h4>
+<p>Настройки бота → тарифы → промокоды</p>
+</div>
+
+<div class="card">
+<h4>ID чата</h4>
+<p>Написать <code>!id</code> в группе</p>
+</div>
+
+</div>
+
+<h2 id="roles">Роли</h2>
+
+<ul>
+<li><strong>Пользователь</strong> — анкета и тарифы</li>
+<li><strong>Администратор</strong> — проверка анкет</li>
+<li><strong>Супер-админ</strong> — управление ботом</li>
+</ul>
+
+<h2 id="user">Пользователь</h2>
+
+<ul>
+<li><strong>Анкета</strong> — заполнение</li>
+<li><strong>Статус</strong> — статус профиля</li>
+<li><strong>Тарифы</strong> — выбор тарифа</li>
+</ul>
+
+<h2 id="admin">Администратор</h2>
+
+<ul>
+<li><code>/admin</code> — открыть админку</li>
+<li>Модерация анкет</li>
+<li>Подтверждение оплат</li>
+</ul>
+
+<h2 id="superadmin">Супер-администратор</h2>
+
+<ul>
+<li>Редактирование сообщений</li>
+<li>Тарифы</li>
+<li>Промокоды</li>
+<li>Список админов</li>
+</ul>
+
+<h2 id="faq">FAQ</h2>
+
+<h3>Нет кнопки админка</h3>
+
+<p>
+Проверьте, что пользователь добавлен в список администраторов.
+</p>
+
+<div class="footer">
+Обновлено: <span id="date"></span>
+</div>
+
+</main>
+
+</div>
+
+<script>
+
+function toggleMenu(){
+document.getElementById("sidebar").classList.toggle("open");
+}
+
+document.getElementById("date").textContent =
+new Date().toLocaleDateString("ru-RU");
+
+document.querySelectorAll("code").forEach(el=>{
+el.onclick=()=>{
+navigator.clipboard.writeText(el.innerText);
+el.style.opacity=".6";
+setTimeout(()=>el.style.opacity="1",400);
+};
+});
+
+</script>
+
+</body>
+</html>

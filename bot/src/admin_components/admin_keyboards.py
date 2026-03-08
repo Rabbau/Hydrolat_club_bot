@@ -47,7 +47,11 @@ moderation_main_menu_inline_keyboard = InlineKeyboardMarkup(
             InlineKeyboardButton(
                 text="Назад",
                 callback_data=AdminCallback(action=AdminAction.SURVEY_BACK).pack(),
-            )
+            ),
+            InlineKeyboardButton(
+                text="В меню",
+                callback_data=AdminCallback(action=AdminAction.SURVEY_BACK).pack(),
+            ),
         ],
     ]
 )
@@ -69,16 +73,37 @@ super_admin_settings_inline_keyboard = InlineKeyboardMarkup(
         ],
         [
             InlineKeyboardButton(
+                text="Список промокодов",
+                callback_data=AdminCallback(action=AdminAction.LIST_PROMOS).pack(),
+            )
+        ],
+        [
+            InlineKeyboardButton(
                 text="Список админов",
                 callback_data=AdminCallback(action=AdminAction.LIST_ADMINS).pack(),
             ),
         ],
         [
             InlineKeyboardButton(
-                text="Создать промокод",
-                callback_data=AdminCallback(action=AdminAction.CREATE_PROMO).pack(),
-            )
+                text="Настройка чата",
+                callback_data=AdminCallback(action=AdminAction.CHAT_SETTINGS).pack(),
+            ),
         ],
+        [
+            InlineKeyboardButton(
+                text="Назад",
+                callback_data=AdminCallback(action=AdminAction.SURVEY_BACK).pack(),
+            ),
+            InlineKeyboardButton(
+                text="В меню",
+                callback_data=AdminCallback(action=AdminAction.SURVEY_BACK).pack(),
+            ),
+        ],
+    ]
+)
+
+admins_list_inline_keyboard = InlineKeyboardMarkup(
+    inline_keyboard=[
         [
             InlineKeyboardButton(
                 text="Добавить админа",
@@ -92,8 +117,37 @@ super_admin_settings_inline_keyboard = InlineKeyboardMarkup(
         [
             InlineKeyboardButton(
                 text="Назад",
+                callback_data=AdminCallback(action=AdminAction.HISTORY).pack(),
+            ),
+            InlineKeyboardButton(
+                text="В меню",
                 callback_data=AdminCallback(action=AdminAction.SURVEY_BACK).pack(),
-            )
+            ),
+        ],
+    ]
+)
+
+chat_settings_inline_keyboard = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text="Установить чат",
+                callback_data=AdminCallback(action=AdminAction.SET_CHAT_ID).pack(),
+            ),
+            InlineKeyboardButton(
+                text="Очистить",
+                callback_data=AdminCallback(action=AdminAction.CLEAR_CHAT_ID).pack(),
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                text="Назад",
+                callback_data=AdminCallback(action=AdminAction.HISTORY).pack(),
+            ),
+            InlineKeyboardButton(
+                text="В меню",
+                callback_data=AdminCallback(action=AdminAction.SURVEY_BACK).pack(),
+            ),
         ],
     ]
 )
@@ -171,8 +225,89 @@ output_settings_inline_keyboard = InlineKeyboardMarkup(
             InlineKeyboardButton(
                 text="Назад",
                 callback_data=AdminCallback(action=AdminAction.HISTORY).pack(),
-            )
+            ),
+            InlineKeyboardButton(
+                text="В меню",
+                callback_data=AdminCallback(action=AdminAction.SURVEY_BACK).pack(),
+            ),
         ],
+    ]
+)
+
+
+# Navigation keyboards for section screens (not for data entry prompts).
+back_to_moderation_and_menu_inline_keyboard = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text="Назад",
+                callback_data=AdminCallback(action=AdminAction.MODERATION).pack(),
+            ),
+            InlineKeyboardButton(
+                text="В меню",
+                callback_data=AdminCallback(action=AdminAction.SURVEY_BACK).pack(),
+            ),
+        ]
+    ]
+)
+
+back_to_review_surveys_and_menu_inline_keyboard = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text="Назад",
+                callback_data=AdminCallback(action=AdminAction.REVIEW_SURVEYS).pack(),
+            ),
+            InlineKeyboardButton(
+                text="В меню",
+                callback_data=AdminCallback(action=AdminAction.SURVEY_BACK).pack(),
+            ),
+        ]
+    ]
+)
+
+back_to_pending_payments_and_menu_inline_keyboard = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text="Назад",
+                callback_data=AdminCallback(action=AdminAction.PENDING_PAYMENTS).pack(),
+            ),
+            InlineKeyboardButton(
+                text="В меню",
+                callback_data=AdminCallback(action=AdminAction.SURVEY_BACK).pack(),
+            ),
+        ]
+    ]
+)
+
+back_to_statistics_and_menu_inline_keyboard = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text="Назад",
+                callback_data=AdminCallback(action=AdminAction.STATISTICS).pack(),
+            ),
+            InlineKeyboardButton(
+                text="В меню",
+                callback_data=AdminCallback(action=AdminAction.SURVEY_BACK).pack(),
+            ),
+        ]
+    ]
+)
+
+back_to_super_admin_and_menu_inline_keyboard = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text="Назад",
+                callback_data=AdminCallback(action=AdminAction.HISTORY).pack(),
+            ),
+            InlineKeyboardButton(
+                text="В меню",
+                callback_data=AdminCallback(action=AdminAction.SURVEY_BACK).pack(),
+            ),
+        ]
     ]
 )
 

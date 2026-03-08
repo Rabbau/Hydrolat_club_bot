@@ -11,6 +11,7 @@ from src.db_components.models import BotMessageType
 from src.db_components.survey_manager import (
     admin_manager,
     bot_message_manager,
+    bot_settings_manager,
     payment_manager,
 )
 from src.db_components.user_manager import user_manager
@@ -194,16 +195,20 @@ class SubscriptionNotifier:
             name = html.escape(user.first_name)
         return f'<a href="tg://user?id={user_id}">{name}</a>'
 
-    def _get_target_chat_ids(self) -> set[int]:
-        chat_ids: set[int] = set()
+    async def _get_target_chat_ids(self) -> set[int]:
+        chat_ids = await bot_settings_manager.get_group_chat_ids()
+        if chat_ids:
+            return chat_ids
+
+        out: set[int] = set()
         single_chat_id = _parse_env_int(os.getenv("GROUP_CHAT_ID"))
         if single_chat_id is not None:
-            chat_ids.add(single_chat_id)
-        chat_ids.update(_parse_env_int_set(os.getenv("GROUP_CHAT_IDS")))
-        return chat_ids
+            out.add(single_chat_id)
+        out.update(_parse_env_int_set(os.getenv("GROUP_CHAT_IDS")))
+        return out
 
     async def _remove_user_from_target_chats(self, bot: Bot, user_id: int) -> str:
-        chat_ids = self._get_target_chat_ids()
+        chat_ids = await self._get_target_chat_ids()
         if not chat_ids:
             return "не настроен (GROUP_CHAT_ID/GROUP_CHAT_IDS)"
 

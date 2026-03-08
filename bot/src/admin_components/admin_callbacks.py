@@ -23,6 +23,11 @@ class AdminAction(StrEnum):
     APPROVE_SURVEY_WITH_DISCOUNT = "approve_survey_discount"
     REJECT_SURVEY = "reject_survey"
     CONFIRM_PAYMENT = "confirm_payment"
+    PENDING_PAYMENT_DETAIL = "pending_payment_detail"
+    CONFIRM_TARIFF = "confirm_tariff"
+    CHANGE_TARIFF = "change_tariff"
+    SET_TARIFF = "set_tariff"
+    REMIND_SELECT_TARIFF = "remind_select_tariff"
 
     # Действия супер-админа (редактирование сообщений и тарифов/админов)
     EDIT_WELCOME = "edit_welcome"
@@ -38,15 +43,21 @@ class AdminAction(StrEnum):
     EDIT_SUBSCRIPTION_EXPIRING_SOON = "edit_subscription_expiring_soon"
     EDIT_SUBSCRIPTION_EXPIRED = "edit_subscription_expired"
     CREATE_PROMO = "create_promo"
+    LIST_PROMOS = "list_promos"
+    DELETE_PROMO = "delete_promo"
     CREATE_PLAN = "create_plan"
     LIST_PLANS = "list_plans"
     DELETE_PLAN = "delete_plan"
     ADD_ADMIN = "add_admin"
     LIST_ADMINS = "list_admins"
     REMOVE_ADMIN = "remove_admin"
+    CHAT_SETTINGS = "chat_settings"
+    SET_CHAT_ID = "set_chat_id"
+    CLEAR_CHAT_ID = "clear_chat_id"
 
 class AdminCallback(CallbackData, prefix="admin"):
     action: AdminAction
     survey_id: int | None = None
     user_id: int | None = None
     plan_id: int | None = None
+    promo_code_id: int | None = None
