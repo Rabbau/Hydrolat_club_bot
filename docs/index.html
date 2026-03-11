@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='none'%3E%3Crect width='32' height='32' rx='8' fill='%236ea8ff'/%3E%3Cpath d='M8 8h16v16H8z' fill='%23f3f6ff'/%3E%3Cpath d='M12 12h8v8h-8z' fill='%236aa7ff'/%3E%3C/svg%3E">
   <title>Gidrolat — Руководство пользователя</title>
   <style>
     * {
@@ -95,6 +96,22 @@
     .burger::-moz-focus-inner { border: 0; }
     .burger:hover {
       background: rgba(255, 255, 255, 0.05);
+    }
+
+    .setup-alert {
+      margin: 16px auto 0;
+      max-width: 1100px;
+      padding: 18px 22px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, rgba(101, 132, 255, 0.15), rgba(255, 255, 255, 0.08));
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      font-size: 15px;
+      color: var(--text);
+      box-shadow: 0 10px 25px rgba(11, 18, 32, 0.65);
+    }
+
+    .setup-alert strong {
+      color: var(--accent);
     }
 
     .burger-icon {
@@ -501,29 +518,20 @@
       height: 180px;
       object-fit: cover;
       display: block;
-      alt: "";
     }
 
-    .screenshot-caption {
+    .screenshot-label {
       position: absolute;
-      bottom: 0;
       left: 0;
       right: 0;
-      padding: 10px;
-      background: rgba(0, 0, 0, 0.7);
-      font-size: 12px;
+      bottom: 0;
+      padding: 12px 8px;
+      background: linear-gradient(180deg, rgba(18, 28, 51, 0), rgba(18, 28, 51, 0.9));
+      color: #eef3ff;
+      font-size: 14px;
       text-align: center;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-    }
-
-    .screenshot-icon {
-      width: 14px;
-      height: 14px;
-      filter: var(--icon-filter);
-      alt: "";
+      pointer-events: none;
+      font-weight: 500;
     }
 
     /* Модальное окно для скриншотов */
@@ -812,10 +820,6 @@
       }
     }
 
-    /* Стили для секций (поиск) */
-    .section {
-      /* контейнер для каждого крупного раздела */
-    }
   </style>
 </head>
 <body>
@@ -829,6 +833,9 @@
       <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23eef3ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><line x1='3' y1='12' x2='21' y2='12'/><line x1='3' y1='6' x2='21' y2='6'/><line x1='3' y1='18' x2='21' y2='18'/></svg>" alt="" class="burger-icon">
     </button>
   </header>
+  <section class="setup-alert" role="alert">
+    <strong>Настройка супер-админа:</strong> перед началом работы обязательно настройте беседу с ботом в настройках супер-админа, чтобы бот мог нормально работать: настройки -> настройки чата
+  </section>
 
   <!-- Затемнение фона -->
   <div class="overlay" onclick="closeSidebar()" aria-hidden="true"></div>
@@ -921,9 +928,17 @@
           <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'/><circle cx='12' cy='7' r='4'/></svg>" alt="" class="toc-item-icon">
           Пользователь
         </div>
-        <div class="toc-item" onclick="scrollToSection('admin')">
+        <div class="toc-item" onclick="scrollToSection('moderator')">
           <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'/></svg>" alt="" class="toc-item-icon">
           Модератор
+        </div>
+        <div class="toc-item" onclick="scrollToSection('admin')">
+          <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'/></svg>" alt="" class="toc-item-icon">
+          Администратор
+        </div>
+        <div class="toc-item" onclick="scrollToSection('developer')">
+          <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='4' width='18' height='16' rx='2' ry='2'/><path d='M3 9h18'/><line x1='8' y1='13' x2='16' y2='13'/></svg>" alt="" class="toc-item-icon">
+          Разработчик
         </div>
         <div class="toc-item" onclick="scrollToSection('superadmin')">
           <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'/><path d='M12 8v4'/><path d='M12 16h.01'/></svg>" alt="" class="toc-item-icon">
@@ -998,46 +1013,74 @@
         <div class="step">
           <span class="step-number">1</span>
           <span>Пользователь нажимает <code>/start</code></span>
-          <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='9 18 15 12 9 6'/></svg>" alt="" class="step-icon">
+          <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>" alt="" class="step-icon">
         </div>
         <div class="step">
           <span class="step-number">2</span>
           <span>Появляется меню бота</span>
-          <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='9 18 15 12 9 6'/></svg>" alt="" class="step-icon">
+          <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>" alt="" class="step-icon">
         </div>
         <div class="step">
           <span class="step-number">3</span>
           <span>Пользователь заполняет анкету</span>
-          <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='9 18 15 12 9 6'/></svg>" alt="" class="step-icon">
+          <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>" alt="" class="step-icon">
         </div>
         <div class="step">
           <span class="step-number">4</span>
           <span>Анкета отправляется на проверку</span>
-          <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='9 18 15 12 9 6'/></svg>" alt="" class="step-icon">
+          <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>" alt="" class="step-icon">
         </div>
         <div class="step">
           <span class="step-number">5</span>
           <span>Модератор проверяет анкету</span>
-          <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='9 18 15 12 9 6'/></svg>" alt="" class="step-icon">
+          <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>" alt="" class="step-icon">
         </div>
         <div class="step">
           <span class="step-number">6</span>
           <span>Пользователь выбирает тариф</span>
-          <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='9 18 15 12 9 6'/></svg>" alt="" class="step-icon">
+          <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>" alt="" class="step-icon">
         </div>
         <div class="step">
           <span class="step-number">7</span>
           <span>Пользователь оплачивает подписку</span>
-          <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='9 18 15 12 9 6'/></svg>" alt="" class="step-icon">
+          <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>" alt="" class="step-icon">
         </div>
         <div class="step">
           <span class="step-number">8</span>
           <span>Модератор подтверждает оплату</span>
-          <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='9 18 15 12 9 6'/></svg>" alt="" class="step-icon">
+          <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>" alt="" class="step-icon">
         </div>
         <div class="step">
           <span class="step-number">9</span>
           <span>Бот отправляет ссылку в чат</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" id="section-moderator">
+      <h2 id="moderator">
+        <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 24 24' fill='none' stroke='%236ea8ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'/></svg>" alt="" class="section-icon">
+        Модераторский flow
+      </h2>
+
+      <div class="flow-grid">
+        <div class="flow-step">
+          <h3>1. Анкета на проверке</h3>
+          <small>открываете заявку и проверяете ответы</small>
+          <p>Поясняйте пользователю, если необходимы правки, или готовьтесь к решению.</p>
+          <div class="screenshot-block">Плейсхолдер: скрин списка заявок на проверке.</div>
+        </div>
+        <div class="flow-step">
+          <h3>2. Решение</h3>
+          <small>одобрить / одобрить со скидкой / отклонить</small>
+          <p>При скидке вводите %, при отклонении — нажимаете «Отклонить», бот уведомит пользователя и предложит заполнить анкету заново.</p>
+          <div class="screenshot-block">Плейсхолдер: скрин окна принятия решения.</div>
+        </div>
+        <div class="flow-step">
+          <h3>3. Ожидают оплату</h3>
+          <small>проверяете тариф, скидки и подтверждаете платеж</small>
+          <p>Напоминаете о выборе тарифа, меняете тариф или подтверждаете оплату и подписку.</p>
+          <div class="screenshot-block">Плейсхолдер: карточка оплаты с кнопками.</div>
         </div>
       </div>
     </div>
@@ -1276,6 +1319,24 @@
       </div>
     </div>
 
+    <div class="section" id="section-developer">
+      <h2 id="developer">
+        <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 24 24' fill='none' stroke='%236ea8ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 6h18M6 6v12h12V6'/></svg>" alt="" class="section-icon">
+        Разработчик
+      </h2>
+
+      <div class="card">
+        <p>Главные ориентиры: фиксировать ошибки, обновлять сценарии и готовить скриншоты для команды.</p>
+        <ul>
+          <li>Проверяйте стартовый маршрут /start → анкета → модерация → тариф → оплата.</li>
+          <li>Изменения клавиатур отражайте в реальном меню и описаниях, чтобы пользователи не терялись.</li>
+          <li>Новые тарифы/промокоды прописывайте в разделе «Настройки бота» и синхронизируйте со справкой.</li>
+          <li>Делайте скрины для модераторов и супер-админов, чтобы вставить в блок «Скриншоты».</li>
+        </ul>
+        <div class="screenshot-block">Плейсхолдер под скрин разработки или логов.</div>
+      </div>
+    </div>
+
     <!-- Скриншоты -->
     <div class="section" id="section-screens">
       <h2 id="screens">
@@ -1284,36 +1345,24 @@
       </h2>
 
       <div class="screenshot-grid">
-        <div class="screenshot-item" onclick="openModal('menu')">
-          <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='180' viewBox='0 0 300 180'%3E%3Crect width='300' height='180' fill='%23121c33'/%3E%3Ctext x='50' y='90' fill='%23a8b6d8' font-family='system-ui' font-size='14'%3EМеню бота%3C/text%3E%3C/svg%3E" alt="Главное меню бота">
-          <div class="screenshot-caption">
-            <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23eef3ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='2' y='2' width='20' height='20' rx='2.18' ry='2.18'/><line x1='8' y1='2' x2='8' y2='22'/><line x1='16' y1='2' x2='16' y2='22'/><line x1='2' y1='8' x2='22' y2='8'/><line x1='2' y1='16' x2='22' y2='16'/></svg>" alt="" class="screenshot-icon">
-            Главное меню
-          </div>
+        <div class="screenshot-item" onclick="openModal(this)" data-caption="Главное меню">
+          <img src="img/main-menu.jpg" alt="Главное меню бота">
+          <div class="screenshot-label">Главное меню</div>
         </div>
         
-        <div class="screenshot-item" onclick="openModal('anketa')">
-          <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='180' viewBox='0 0 300 180'%3E%3Crect width='300' height='180' fill='%23121c33'/%3E%3Ctext x='50' y='90' fill='%23a8b6d8' font-family='system-ui' font-size='14'%3EАнкета%3C/text%3E%3C/svg%3E" alt="Форма анкеты">
-          <div class="screenshot-caption">
-            <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23eef3ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/><polyline points='14 2 14 8 20 8'/><line x1='16' y1='13' x2='8' y2='13'/><line x1='16' y1='17' x2='8' y2='17'/><polyline points='10 9 9 9 8 9'/></svg>" alt="" class="screenshot-icon">
-            Форма анкеты
-          </div>
+        <div class="screenshot-item" onclick="openModal(this)" data-caption="Форма анкеты">
+          <img src="img/questionnaire.jpg" alt="Форма анкеты">
+          <div class="screenshot-label">Анкета</div>
         </div>
         
-        <div class="screenshot-item" onclick="openModal('tariffs')">
-          <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='180' viewBox='0 0 300 180'%3E%3Crect width='300' height='180' fill='%23121c33'/%3E%3Ctext x='50' y='90' fill='%23a8b6d8' font-family='system-ui' font-size='14'%3EТарифы%3C/text%3E%3C/svg%3E" alt="Выбор тарифа">
-          <div class="screenshot-caption">
-            <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23eef3ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><line x1='12' y1='1' x2='12' y2='23'/><path d='M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6'/></svg>" alt="" class="screenshot-icon">
-            Выбор тарифа
-          </div>
+        <div class="screenshot-item" onclick="openModal(this)" data-caption="Выбор тарифа">
+          <img src="img/tariff.jpg" alt="Выбор тарифа">
+          <div class="screenshot-label">Тарифы</div>
         </div>
         
-        <div class="screenshot-item" onclick="openModal('admin')">
-          <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='180' viewBox='0 0 300 180'%3E%3Crect width='300' height='180' fill='%23121c33'/%3E%3Ctext x='50' y='90' fill='%23a8b6d8' font-family='system-ui' font-size='14'%3EАдмин панель%3C/text%3E%3C/svg%3E" alt="Панель модератора">
-          <div class="screenshot-caption">
-            <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23eef3ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'/></svg>" alt="" class="screenshot-icon">
-            Панель модератора
-          </div>
+        <div class="screenshot-item" onclick="openModal(this)" data-caption="Панель модератора">
+          <img src="img/admin_panel.jpg" alt="Панель модератора">
+          <div class="screenshot-label">Админ панель</div>
         </div>
       </div>
 
@@ -1441,7 +1490,7 @@
 
     // Подсветка активного раздела в сайдбаре (используем getBoundingClientRect)
     function highlightActiveSection() {
-      const sections = ['about', 'flow', 'roles', 'user', 'admin', 'superadmin', 'screens', 'faq'];
+      const sections = ['about', 'flow', 'moderator', 'roles', 'user', 'admin', 'developer', 'superadmin', 'screens', 'faq'];
       const scrollY = window.scrollY;
       const headerOffset = 100; // учитываем высоту шапки
 
@@ -1567,13 +1616,19 @@
     }
 
     // Модальное окно для скриншотов
-    function openModal(type) {
+    function openModal(element) {
       const modal = document.getElementById('imageModal');
       const modalImg = document.getElementById('modalImage');
-      
-      // В реальности здесь можно подставить путь к изображению
-      modalImg.src = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='600' viewBox='0 0 800 600'%3E%3Crect width='800' height='600' fill='%23121c33'/%3E%3Ctext x='200' y='300' fill='%23a8b6d8' font-family='system-ui' font-size='24'%3EСкриншот ${type}%3C/text%3E%3C/svg%3E`;
-      
+      const screenshot = element?.querySelector('img');
+
+      if (!screenshot) {
+        return;
+      }
+
+      const caption = element.dataset.caption || screenshot.alt;
+      modalImg.src = screenshot.src;
+      modalImg.alt = caption || 'Скриншот';
+
       modal.classList.add('active');
       modal.setAttribute('aria-hidden', 'false');
     }
