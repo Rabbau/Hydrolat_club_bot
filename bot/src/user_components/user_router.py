@@ -1,11 +1,19 @@
 ﻿import logging
 import os
+from pathlib import Path
 
 from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, ChatJoinRequest, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.types import (
+    CallbackQuery,
+    ChatJoinRequest,
+    FSInputFile,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+)
 
 from src.FormManager.FormManager import FormManager
 from src.db_components.models import BotMessageType, SurveyStatusEnum
@@ -27,6 +35,41 @@ from src.user_components.user_states import UserFSM
 
 logger = logging.getLogger(__name__)
 user_router = Router(name="user_router")
+DOCS_DIR = Path(__file__).resolve().parents[3] / "docs"
+
+
+def _find_user_agreement_file() -> Path | None:
+    explicit_candidates = (
+        DOCS_DIR / "Polzovatelskoe_soglashenie.docx",
+        DOCS_DIR / "Polzovatelskoe_soglashenie.doc",
+        DOCS_DIR / "user_agreement.docx",
+        DOCS_DIR / "user_agreement.doc",
+    )
+    for candidate in explicit_candidates:
+        if candidate.exists():
+            return candidate
+
+    for mask in ("*soglash*.docx", "*soglash*.doc", "*agreement*.docx", "*agreement*.doc"):
+        matches = sorted(DOCS_DIR.glob(mask))
+        if matches:
+            return matches[0]
+    return None
+
+
+async def _send_chat_rules_and_agreement(target_message: Message) -> None:
+    chat_rules_text = await _get_message_text(
+        BotMessageType.CHAT_RULES,
+        "<b>Правила чата</b>\n\n"
+        "Оплачивая Вы соглашаетесь с правилами чата.",
+    )
+    await target_message.answer(chat_rules_text)
+
+    agreement_path = _find_user_agreement_file()
+    if agreement_path is not None:
+        await target_message.answer_document(
+            FSInputFile(agreement_path),
+            caption="Пользовательское соглашение",
+        )
 
 
 async def _get_message_text(message_type: BotMessageType, fallback: str) -> str:
@@ -404,18 +447,27 @@ async def _payment_summary_for_user(user_id: int) -> tuple[str, InlineKeyboardMa
     total_discount = min(100, personal + promo)
     final_price = plan.price * (100 - total_discount) / 100
 
-    lines = [
-        "<b>Проверка оплаты</b>",
-        "",
-        f"Тариф: <b>{plan.name}</b>",
-        f"Цена: <b>{plan.price:.2f} ₽</b>",
-        f"Скидка персональная: <b>{personal}%</b>",
-        f"Скидка по промокоду: <b>{promo}%</b>",
-        f"Итого скидка: <b>{total_discount}%</b>",
-        f"К оплате: <b>{final_price:.2f} ₽</b>",
-        "",
-        "Нажмите «Оплатить», чтобы получить реквизиты.",
-    ]
+    summary_template = await _get_message_text(
+        BotMessageType.PAYMENT_BEFORE_BUTTON,
+        "<b>Проверка оплаты</b>\n\n"
+        "Тариф: <b>{plan_name}</b>\n"
+        "Цена: <b>{plan_price}</b>\n"
+        "Скидка персональная: <b>{personal_discount}%</b>\n"
+        "Скидка по промокоду: <b>{promo_discount}%</b>\n"
+        "Итого скидка: <b>{total_discount}%</b>\n"
+        "К оплате: <b>{final_price}</b>\n\n"
+        "После нажатие на оплатить вы увидете правила и польз.соглашение. "
+        "Совершая оплату вы соглашаетесь на все правила.\n"
+        "Нажмите «Оплатить», чтобы отправить заявку администратору.",
+    )
+    text = (
+        summary_template.replace("{plan_name}", plan.name)
+        .replace("{plan_price}", f"{plan.price:.2f} ₽")
+        .replace("{personal_discount}", str(personal))
+        .replace("{promo_discount}", str(promo))
+        .replace("{total_discount}", str(total_discount))
+        .replace("{final_price}", f"{final_price:.2f} ₽")
+    )
 
     kb = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -427,7 +479,7 @@ async def _payment_summary_for_user(user_id: int) -> tuple[str, InlineKeyboardMa
             ]
         ]
     )
-    return "\n".join(lines), kb
+    return text, kb
 
 
 @user_router.callback_query(
@@ -446,6 +498,7 @@ async def approved_survey_skip_promo(callback: CallbackQuery, state: FSMContext)
         await state.clear()
         return
     text, kb = summary
+    await _send_chat_rules_and_agreement(callback.message)
     await callback.message.answer(text, reply_markup=kb)
     await state.clear()
     await callback.answer()
@@ -459,30 +512,23 @@ async def approved_survey_pay(callback: CallbackQuery, state: FSMContext):
         await callback.answer("Нет заявки на оплату.", show_alert=True)
         return
     await survey_manager.mark_user_payment_started(user_id)
-
-    plans = await payment_manager.get_payment_plans()
-    plan = next((p for p in plans if p.id == survey.selected_plan_id), None)
-    if not plan:
-        await callback.answer("Тариф больше недоступен.", show_alert=True)
-        return
-
-    personal = int(survey.personal_discount or 0)
-    promo = int(survey.promo_discount or 0)
-    total_discount = min(100, personal + promo)
-    final_price = plan.price * (100 - total_discount) / 100
-
-    payment_details = await bot_message_manager.get_message(BotMessageType.PAYMENT_DETAILS)
-    details_text = (
-        payment_details.content
-        if payment_details
-        else "Реквизиты для оплаты не настроены. Напишите администратору."
+    payment_details_text = await _get_message_text(
+        BotMessageType.PAYMENT_DETAILS,
+        "Реквизиты для оплаты:\n\n"
+        "Карта: <code>0000 0000 0000 0000</code>\n"
+        "Получатель: <b>Администратор</b>\n"
+        "Банк: <b>Укажите в настройках</b>\n\n"
+        "Оплатите по реквизитам. Заявка уже отправлена администратору на проверку.",
     )
-    await callback.message.answer(
-        f"<b>К оплате: {final_price:.2f} ₽</b>\n\n{details_text}\n\n"
-        "После оплаты администратор подтвердит платеж, и вы получите доступ."
+    request_sent_text = await _get_message_text(
+        BotMessageType.PAYMENT_REQUEST_SENT,
+        "Заявка на проверку оплаты отправлена.\n\n"
+        "Администратор проверит оплату и после подтверждения вы получите ссылку для входа в чат.",
     )
+    await callback.message.answer(payment_details_text)
+    await callback.message.answer(request_sent_text)
     await state.clear()
-    await callback.answer()
+    await callback.answer("Заявка отправлена")
 
 
 @user_router.message(F.text == "Анкета")
@@ -664,6 +710,7 @@ async def payment_promo_code_process(message: Message, state: FSMContext):
         await state.clear()
         return
     summary_text, kb = summary
+    await _send_chat_rules_and_agreement(message)
     await message.answer(summary_text, reply_markup=kb)
     await state.clear()
 
@@ -702,4 +749,3 @@ async def survey_yes_no(
         form=form,
     )
     await callback.answer()
-

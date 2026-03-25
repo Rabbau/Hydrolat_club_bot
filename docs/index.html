@@ -269,6 +269,7 @@
       max-width: 1000px;
       margin: 0 auto;
       padding: 20px;
+      overflow-x: hidden;
     }
 
     /* Кнопка наверх */
@@ -795,6 +796,8 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
     }
 
     .footer-icon {
@@ -806,17 +809,128 @@
     }
 
     /* Адаптивность */
+    @media (max-width: 900px) {
+      .toc-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
     @media (max-width: 700px) {
+      body {
+        line-height: 1.5;
+      }
+
+      .header {
+        padding: 12px 14px;
+      }
+
+      .logo {
+        font-size: 16px;
+      }
+
+      .setup-alert {
+        margin: 12px 12px 0;
+        padding: 14px;
+        font-size: 14px;
+      }
+
+      .sidebar {
+        width: 86vw;
+        left: -86vw;
+      }
+
       h2 {
-        font-size: 24px;
+        font-size: 22px;
       }
       
       .container {
-        padding: 16px;
+        padding: 14px;
       }
       
+      .card {
+        padding: 14px;
+        border-radius: 12px;
+      }
+
       .step {
         padding: 12px;
+      }
+
+      .step-number {
+        width: 28px;
+        height: 28px;
+        font-size: 13px;
+      }
+
+      .roles-table {
+        min-width: 420px;
+        font-size: 13px;
+      }
+
+      .roles-table th,
+      .roles-table td {
+        padding: 9px;
+      }
+
+      pre {
+        padding: 12px;
+        padding-top: 36px;
+        font-size: 12px;
+      }
+
+      code {
+        font-size: 12px;
+        word-break: break-word;
+      }
+
+      .toc-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .screenshot-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .faq-question {
+        align-items: flex-start;
+      }
+
+      .scroll-top {
+        width: 44px;
+        height: 44px;
+        right: 14px;
+        bottom: 14px;
+      }
+    }
+
+    @media (max-width: 420px) {
+      .logo {
+        font-size: 15px;
+      }
+
+      .header {
+        padding: 10px 12px;
+      }
+
+      .setup-alert {
+        margin: 10px 10px 0;
+        padding: 12px;
+      }
+
+      h2 {
+        font-size: 20px;
+      }
+
+      h3 {
+        font-size: 18px;
+      }
+
+      .card {
+        padding: 12px;
+      }
+
+      .roles-table {
+        min-width: 360px;
       }
     }
 
@@ -878,6 +992,10 @@
       <a href="#superadmin" onclick="navigateToSection('superadmin'); return false;">
         <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23eef3ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'/><path d='M12 8v4'/><path d='M12 16h.01'/></svg>" alt="" class="nav-icon">
         Супер-админ
+      </a>
+      <a href="#operations" onclick="navigateToSection('operations'); return false;">
+        <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23eef3ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M9 11l3 3L22 4'/><path d='M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'/></svg>" alt="" class="nav-icon">
+        Регламент админа
       </a>
       <a href="#screens" onclick="navigateToSection('screens'); return false;">
         <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23eef3ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='2' y='2' width='20' height='20' rx='2.18' ry='2.18'/><line x1='8' y1='2' x2='8' y2='22'/><line x1='16' y1='2' x2='16' y2='22'/><line x1='2' y1='8' x2='22' y2='8'/><line x1='2' y1='16' x2='22' y2='16'/></svg>" alt="" class="nav-icon">
@@ -943,6 +1061,10 @@
         <div class="toc-item" onclick="scrollToSection('superadmin')">
           <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'/><path d='M12 8v4'/><path d='M12 16h.01'/></svg>" alt="" class="toc-item-icon">
           Супер-админ
+        </div>
+        <div class="toc-item" onclick="scrollToSection('operations')">
+          <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M9 11l3 3L22 4'/><path d='M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'/></svg>" alt="" class="toc-item-icon">
+          Регламент админа
         </div>
         <div class="toc-item" onclick="scrollToSection('screens')">
           <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='2' y='2' width='20' height='20' rx='2.18' ry='2.18'/><line x1='8' y1='2' x2='8' y2='22'/><line x1='16' y1='2' x2='16' y2='22'/><line x1='2' y1='8' x2='22' y2='8'/><line x1='2' y1='16' x2='22' y2='16'/></svg>" alt="" class="toc-item-icon">
@@ -1042,17 +1164,17 @@
         </div>
         <div class="step">
           <span class="step-number">7</span>
-          <span>Пользователь оплачивает подписку</span>
+          <span>Пользователь получает правила чата и файл пользовательского соглашения перед кнопкой «Оплатить»</span>
           <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>" alt="" class="step-icon">
         </div>
         <div class="step">
           <span class="step-number">8</span>
-          <span>Модератор подтверждает оплату</span>
+          <span>После нажатия «Оплатить» бот отправляет реквизиты и уведомляет, что админ проверяет оплату</span>
           <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>" alt="" class="step-icon">
         </div>
         <div class="step">
           <span class="step-number">9</span>
-          <span>Бот отправляет ссылку в чат</span>
+          <span>Модератор подтверждает тариф, затем оплату; бот отправляет подтверждение и ссылку в чат</span>
         </div>
       </div>
     </div>
@@ -1068,19 +1190,16 @@
           <h3>1. Анкета на проверке</h3>
           <small>открываете заявку и проверяете ответы</small>
           <p>Поясняйте пользователю, если необходимы правки, или готовьтесь к решению.</p>
-          <div class="screenshot-block">Плейсхолдер: скрин списка заявок на проверке.</div>
         </div>
         <div class="flow-step">
           <h3>2. Решение</h3>
           <small>одобрить / одобрить со скидкой / отклонить</small>
           <p>При скидке вводите %, при отклонении — нажимаете «Отклонить», бот уведомит пользователя и предложит заполнить анкету заново.</p>
-          <div class="screenshot-block">Плейсхолдер: скрин окна принятия решения.</div>
         </div>
         <div class="flow-step">
           <h3>3. Ожидают оплату</h3>
-          <small>проверяете тариф, скидки и подтверждаете платеж</small>
-          <p>Напоминаете о выборе тарифа, меняете тариф или подтверждаете оплату и подписку.</p>
-          <div class="screenshot-block">Плейсхолдер: карточка оплаты с кнопками.</div>
+          <small>проверяете тариф и скидки, подтверждаете тариф, затем подтверждаете платеж</small>
+          <p>На этапе оплаты обязательно: 1) проверить или сменить тариф, 2) нажать «Подтвердить тариф», 3) только после факта оплаты подтверждать платеж и подписку.</p>
         </div>
       </div>
     </div>
@@ -1192,7 +1311,7 @@
 
       <div class="tip">
         <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%2310b981' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'/><line x1='12' y1='16' x2='12' y2='12'/><line x1='12' y1='8' x2='12.01' y2='8'/></svg>" alt="" class="message-icon">
-        <div>После подтверждения оплаты бот автоматически отправляет ссылку для входа в закрытый чат</div>
+        <div>Перед кнопкой «Оплатить» бот отправляет правила чата и файл пользовательского соглашения. После нажатия «Оплатить» отправляются реквизиты и сообщение о проверке; ссылка в чат приходит после подтверждения оплаты модератором.</div>
       </div>
     </div>
 
@@ -1303,19 +1422,36 @@
               Реквизиты оплаты
             </li>
             <li>
-              <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'/><line x1='18' y1='6' x2='6' y2='18'/><line x1='6' y1='6' x2='18' y2='18'/></svg>" alt="" class="list-icon">
-              Отказ анкеты
+              <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 6h18'/><path d='M7 12h10'/><path d='M10 18h4'/></svg>" alt="" class="list-icon">
+              Текст перед кнопкой «Оплатить»
+            </li>
+            <li>
+              <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 12h18'/><polyline points='12 5 19 12 12 19'/></svg>" alt="" class="list-icon">
+              Текст после кнопки «Оплатить»
+            </li>
+            <li>
+              <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M4 4h16v16H4z'/><path d='M8 8h8v8H8z'/></svg>" alt="" class="list-icon">
+              Правила чата и пользовательское соглашение (файл)
             </li>
             <li>
               <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='20 6 9 17 4 12'/></svg>" alt="" class="list-icon">
-              После анкеты
+              Подтверждение оплаты и отказ анкеты
             </li>
             <li>
-              <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M20.59 13.41l-2.17 2.17a4 4 0 0 1-5.66 0L9 12 3 6'/><path d='M8 12l-5 5'/><path d='M16 12l5-5'/></svg>" alt="" class="list-icon">
-              Промокоды
+              <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M12 1v22'/><path d='M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6'/></svg>" alt="" class="list-icon">
+              Промокоды, заголовок тарифов, пустой статус
+            </li>
+            <li>
+              <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 12h18'/><path d='M12 3v18'/></svg>" alt="" class="list-icon">
+              Напоминание об окончании и сообщение об окончании подписки
             </li>
           </ul>
         </div>
+      </div>
+
+      <div class="note">
+        <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%233b82f6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'/><line x1='12' y1='16' x2='12' y2='12'/><line x1='12' y1='8' x2='12.01' y2='8'/></svg>" alt="" class="message-icon">
+        <div>Файл пользовательского соглашения должен лежать в <code>docs/Polzovatelskoe_soglashenie.docx</code>. Бот отправляет его вместе с правилами чата перед сообщением с кнопкой «Оплатить».</div>
       </div>
     </div>
 
@@ -1333,7 +1469,115 @@
           <li>Новые тарифы/промокоды прописывайте в разделе «Настройки бота» и синхронизируйте со справкой.</li>
           <li>Делайте скрины для модераторов и супер-админов, чтобы вставить в блок «Скриншоты».</li>
         </ul>
-        <div class="screenshot-block">Плейсхолдер под скрин разработки или логов.</div>
+      </div>
+    </div>
+
+    <!-- Операционный регламент -->
+    <div class="section" id="section-operations">
+      <h2 id="operations">
+        <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 24 24' fill='none' stroke='%236ea8ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M9 11l3 3L22 4'/><path d='M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'/></svg>" alt="" class="section-icon">
+        Операционный регламент админа
+      </h2>
+
+      <div class="warning">
+        <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23f59e0b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'/><line x1='12' y1='8' x2='12' y2='12'/><line x1='12' y1='16' x2='12.01' y2='16'/></svg>" alt="" class="message-icon">
+        <div><strong>Главный принцип:</strong> сначала фиксируете корректный статус анкеты и тариф, затем подтверждаете оплату. Не наоборот.</div>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <div class="card-header">
+            <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%236ea8ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M8 6h13'/><path d='M8 12h13'/><path d='M8 18h13'/><path d='M3 6h.01'/><path d='M3 12h.01'/><path d='M3 18h.01'/></svg>" alt="" class="card-icon">
+            <h3>Чек-лист смены (каждый день)</h3>
+          </div>
+          <ul>
+            <li>Откройте <code>/admin</code> и проверьте раздел «Анкеты на проверке».</li>
+            <li>Проверьте раздел «Ожидают оплату»: нет ли заявок старше 24 часов.</li>
+            <li>Убедитесь, что в «Списке тарифов» нет неактуальных цен.</li>
+            <li>Проверьте «Список промокодов»: отключите устаревшие/ошибочные.</li>
+            <li>Проверьте настройки чата: bot добавлен в нужный chat и есть права на invite links.</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%236ea8ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/><polyline points='14 2 14 8 20 8'/><line x1='16' y1='13' x2='8' y2='13'/><line x1='16' y1='17' x2='8' y2='17'/></svg>" alt="" class="card-icon">
+            <h3>SLA и приоритеты</h3>
+          </div>
+          <ul>
+            <li><strong>P1:</strong> пользователь оплатил, но нет доступа в чат — реакция до 15 минут.</li>
+            <li><strong>P2:</strong> анкета/оплата зависла в статусе — реакция до 1 часа.</li>
+            <li><strong>P3:</strong> правки текстов и тарифов — в течение рабочего дня.</li>
+            <li>Если реакция выходит за SLA — эскалация супер-админу в тот же час.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%236ea8ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='22 12 18 8 18 16 22 12'/><rect x='2' y='6' width='12' height='12' rx='1' ry='1'/><path d='M2 12h10'/></svg>" alt="" class="card-icon">
+          <h3>Пошаговые SOP-сценарии</h3>
+        </div>
+        <h3>1. Обработка анкеты</h3>
+        <ul>
+          <li>Откройте анкету и проверьте полноту ответов.</li>
+          <li>Если ответы валидны: «Одобрить» или «Одобрить со скидкой».</li>
+          <li>Если ответы невалидны: «Отклонить», укажите причину в корректной формулировке.</li>
+        </ul>
+
+        <h3>2. Ведение оплаты</h3>
+        <ul>
+          <li>Проверьте, что пользователь выбрал тариф.</li>
+          <li>Если тариф менялся админом, обязательно нажмите «Подтвердить тариф» в карточке оплаты.</li>
+          <li>Проверьте персональную и промо-скидку перед подтверждением.</li>
+          <li>Сверьте факт поступления средств и только после этого жмите подтверждение оплаты.</li>
+        </ul>
+
+        <h3>3. Восстановление доступа</h3>
+        <ul>
+          <li>Если подписка активна, но вход не прошёл — инициируйте повторную выдачу ссылки.</li>
+          <li>Если подписка истекла — не выдавайте доступ до оплаты/продления.</li>
+          <li>Любое ручное исключение фиксируйте отдельным комментарием для команды.</li>
+        </ul>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <div class="card-header">
+            <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%236ea8ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'/></svg>" alt="" class="card-icon">
+            <h3>Шаблоны сообщений</h3>
+          </div>
+          <pre><code>Анкета одобрена:
+Ваша анкета одобрена. Выберите тариф и завершите оплату.
+
+Ожидаем оплату:
+Платеж еще не зафиксирован. После оплаты пришлите подтверждение.
+
+Доступ выдан:
+Оплата подтверждена. Доступ в чат открыт, проверьте кнопку/ссылку.</code></pre>
+          <button class="copy-button" onclick="copyCode(this)" aria-label="Копировать шаблоны">
+            <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23eef3ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='9' y='9' width='13' height='13' rx='2' ry='2'/><path d='M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'/></svg>" alt="" class="copy-icon">
+            Копировать
+          </button>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%236ea8ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'/><line x1='12' y1='8' x2='12' y2='12'/><line x1='12' y1='16' x2='12.01' y2='16'/></svg>" alt="" class="card-icon">
+            <h3>Критичные ошибки (не допускать)</h3>
+          </div>
+          <ul>
+            <li>Подтверждение оплаты без фактического платежа.</li>
+            <li>Смена тарифа после подтверждения без фиксации причины.</li>
+            <li>Редактирование текстов без проверки на тестовом пользователе.</li>
+            <li>Очистка чатов/настроек в рабочее время без уведомления команды.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="tip">
+        <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%2310b981' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'/><line x1='12' y1='16' x2='12' y2='12'/><line x1='12' y1='8' x2='12.01' y2='8'/></svg>" alt="" class="message-icon">
+        <div>После любых изменений в «Настройках бота» проверяйте путь end-to-end: <code>/start → анкета → одобрение → тариф → оплата → вход в чат</code>.</div>
       </div>
     </div>
 
@@ -1421,6 +1665,46 @@
           Отправьте боту команду <code>/id</code> — бот пришлёт ваш уникальный идентификатор.
         </div>
       </div>
+
+      <div class="faq-item">
+        <div class="faq-question" onclick="toggleFAQ(this)">
+          <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='9 18 15 12 9 6'/></svg>" alt="" class="faq-icon">
+          <strong>Оплата есть, а ссылка в чат не пришла</strong>
+        </div>
+        <div class="faq-answer">
+          Проверьте: 1) бот добавлен в целевой чат, 2) в «Настройках чата» указан верный chat_id, 3) оплата подтверждена в карточке заявки. После исправления повторите подтверждение оплаты.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-question" onclick="toggleFAQ(this)">
+          <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='9 18 15 12 9 6'/></svg>" alt="" class="faq-icon">
+          <strong>У пользователя два платежа подряд</strong>
+        </div>
+        <div class="faq-answer">
+          Не подтверждайте обе заявки автоматически. Сверьте даты/суммы и активную подписку. Второй платеж проведите как продление и зафиксируйте комментарий в рабочем чате команды.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-question" onclick="toggleFAQ(this)">
+          <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='9 18 15 12 9 6'/></svg>" alt="" class="faq-icon">
+          <strong>Как безопасно изменить реквизиты оплаты</strong>
+        </div>
+        <div class="faq-answer">
+          Меняйте реквизиты в «Настройка вывода», сразу проверяйте тестовой оплатой на минимальном тарифе и только потом сообщайте команде, что изменения применены.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-question" onclick="toggleFAQ(this)">
+          <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a8b6d8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='9 18 15 12 9 6'/></svg>" alt="" class="faq-icon">
+          <strong>Когда нужно звать разработчика</strong>
+        </div>
+        <div class="faq-answer">
+          Если повторяется системная ошибка (одинаковый сбой у нескольких пользователей), если статусы не меняются после корректных действий админа, или если не создаются ссылки приглашения при правильных правах бота.
+        </div>
+      </div>
     </div>
 
     <!-- Футер -->
@@ -1490,7 +1774,7 @@
 
     // Подсветка активного раздела в сайдбаре (используем getBoundingClientRect)
     function highlightActiveSection() {
-      const sections = ['about', 'flow', 'moderator', 'roles', 'user', 'admin', 'developer', 'superadmin', 'screens', 'faq'];
+      const sections = ['about', 'flow', 'moderator', 'roles', 'user', 'admin', 'developer', 'superadmin', 'operations', 'screens', 'faq'];
       const scrollY = window.scrollY;
       const headerOffset = 100; // учитываем высоту шапки
 

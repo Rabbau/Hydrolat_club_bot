@@ -237,6 +237,8 @@ class BotMessageType(StrEnum):
     WELCOME = "welcome"
     SURVEY_SUBMITTED = "survey_submitted"
     PAYMENT_DETAILS = "payment_details"
+    PAYMENT_BEFORE_BUTTON = "payment_before_button"
+    PAYMENT_REQUEST_SENT = "payment_request_sent"
     CHAT_RULES = "chat_rules"
     PAYMENT_CONFIRMED = "payment_confirmed"
     SURVEY_REJECTED = "survey_rejected"

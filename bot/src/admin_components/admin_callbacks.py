@@ -33,6 +33,8 @@ class AdminAction(StrEnum):
     EDIT_WELCOME = "edit_welcome"
     EDIT_SURVEY_SUBMITTED = "edit_survey_submitted"
     EDIT_PAYMENT_DETAILS = "edit_payment_details"
+    EDIT_PAYMENT_BEFORE_BUTTON = "edit_payment_before_button"
+    EDIT_PAYMENT_REQUEST_SENT = "edit_payment_request_sent"
     EDIT_CHAT_RULES = "edit_chat_rules"
     EDIT_PAYMENT_CONFIRMED = "edit_payment_confirmed"
     EDIT_SURVEY_REJECTED = "edit_survey_rejected"

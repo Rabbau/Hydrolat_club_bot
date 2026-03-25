@@ -2,6 +2,7 @@ import html
 
 from aiogram import F, Router
 from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from src.FormManager.FormManager import FormManager
@@ -54,7 +55,8 @@ async def survey_menu(callback: CallbackQuery, form: FormManager):
 
 
 @admin_router.callback_query(AdminCallback.filter(F.action == AdminAction.MODERATION))
-async def moderation_menu(callback: CallbackQuery):
+async def moderation_menu(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
     await show_moderation_menu(callback)
 
 
@@ -251,5 +253,6 @@ async def statistics_active_subscriptions_list(callback: CallbackQuery):
 
 
 @admin_router.callback_query(AdminCallback.filter(F.action == AdminAction.HISTORY))
-async def super_admin_menu(callback: CallbackQuery):
+async def super_admin_menu(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
     await show_super_admin_menu(callback)

@@ -3,6 +3,30 @@
 from src.admin_components.admin_callbacks import AdminAction, AdminCallback
 
 
+def build_back_and_menu_inline_keyboard(
+    back_action: AdminAction,
+    *,
+    survey_id: int | None = None,
+) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Назад",
+                    callback_data=AdminCallback(
+                        action=back_action,
+                        survey_id=survey_id,
+                    ).pack(),
+                ),
+                InlineKeyboardButton(
+                    text="В меню",
+                    callback_data=AdminCallback(action=AdminAction.SURVEY_BACK).pack(),
+                ),
+            ]
+        ]
+    )
+
+
 admin_main_menu_inline_keyboard = InlineKeyboardMarkup(
     inline_keyboard=[
         [
@@ -173,6 +197,20 @@ output_settings_inline_keyboard = InlineKeyboardMarkup(
             InlineKeyboardButton(
                 text="Отказ",
                 callback_data=AdminCallback(action=AdminAction.EDIT_SURVEY_REJECTED).pack(),
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                text="Перед кнопкой «Оплатить»",
+                callback_data=AdminCallback(
+                    action=AdminAction.EDIT_PAYMENT_BEFORE_BUTTON
+                ).pack(),
+            ),
+            InlineKeyboardButton(
+                text="После «Оплатить»",
+                callback_data=AdminCallback(
+                    action=AdminAction.EDIT_PAYMENT_REQUEST_SENT
+                ).pack(),
             ),
         ],
         [

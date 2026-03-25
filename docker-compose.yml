@@ -26,6 +26,7 @@ services:
         condition: service_healthy
     volumes:
       - ./bot:/app
+      - ./docs:/docs:ro
     environment:
       DATABASE_URL: postgresql+asyncpg://${DB_USER:-tg_bot_user}:${DB_PASSWORD:-tg_bot_password}@postgres:5432/${DB_NAME:-tg_bot_db}
       BOT_TOKEN: ${BOT_TOKEN}

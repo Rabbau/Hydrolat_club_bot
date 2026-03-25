@@ -13,6 +13,7 @@ from src.FormManager.FormManager import FormManager
 from src.admin_components.admin_callbacks import AdminAction, AdminCallback
 from src.admin_components.admin_filter import AdminFilter, SuperAdminFilter
 from src.admin_components.admin_keyboards import (
+    build_back_and_menu_inline_keyboard,
     back_to_main_inline_keyboard,
     back_to_moderation_and_menu_inline_keyboard,
     back_to_pending_payments_and_menu_inline_keyboard,
@@ -53,6 +54,32 @@ class ModerationFSM(StatesGroup):
     creating_promo = State()
     creating_plan = State()
     setting_chat_id = State()
+
+
+def _is_back_text(text: str | None) -> bool:
+    return (text or "").strip().casefold() == "назад"
+
+
+async def _handle_state_back(
+    message: Message,
+    state: FSMContext,
+    *,
+    back_action: AdminAction,
+    text: str,
+    survey_id: int | None = None,
+) -> bool:
+    if not _is_back_text(message.text):
+        return False
+
+    await state.clear()
+    await message.answer(
+        text,
+        reply_markup=build_back_and_menu_inline_keyboard(
+            back_action,
+            survey_id=survey_id,
+        ),
+    )
+    return True
 
 async def _resolve_user_id_from_admin_input(message: Message) -> tuple[int | None, str | None]:
     """
@@ -189,7 +216,8 @@ def _approved_survey_plans_keyboard(plans) -> InlineKeyboardMarkup:
 
 
 @super_admin_router.callback_query(AdminCallback.filter(F.action == AdminAction.CHAT_SETTINGS))
-async def chat_settings_menu(callback: CallbackQuery):
+async def chat_settings_menu(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
     db_chat_ids = await bot_settings_manager.get_group_chat_ids()
     env_chat_ids: set[int] = set()
     single_env = _parse_env_int(os.getenv("GROUP_CHAT_ID"))
@@ -226,13 +254,23 @@ async def set_chat_id_start(callback: CallbackQuery, state: FSMContext):
     await callback.message.edit_text(
         "Отправьте <b>ID чата</b> (например <code>-100...</code>).\n"
         "Можно прислать числом или переслать сообщение из нужного чата.\n\n"
-        "Важно: бот должен быть добавлен в этот чат и иметь нужные права.",
+        "Важно: бот должен быть добавлен в этот чат и иметь нужные права.\n\n"
+        "Чтобы вернуться, нажмите «Назад».",
+        reply_markup=build_back_and_menu_inline_keyboard(AdminAction.CHAT_SETTINGS),
     )
     await callback.answer()
 
 
 @super_admin_router.message(ModerationFSM.setting_chat_id)
 async def set_chat_id_process(message: Message, state: FSMContext):
+    if await _handle_state_back(
+        message,
+        state,
+        back_action=AdminAction.CHAT_SETTINGS,
+        text="<b>Настройка чата</b>\n\nНажмите кнопку ниже, чтобы продолжить.",
+    ):
+        return
+
     chat_id: int | None = None
 
     if message.forward_from_chat and message.forward_from_chat.id:
@@ -314,8 +352,12 @@ async def review_surveys_menu(callback: CallbackQuery):
     AdminCallback.filter(F.action == AdminAction.REVIEW_SURVEY_DETAIL)
 )
 async def review_survey_detail(
-    callback: CallbackQuery, callback_data: AdminCallback, form: FormManager
+    callback: CallbackQuery,
+    callback_data: AdminCallback,
+    form: FormManager,
+    state: FSMContext,
 ):
+    await state.clear()
     survey_id = callback_data.survey_id
     if survey_id is None:
         await callback.answer("Анкета не выбрана.", show_alert=True)
@@ -443,7 +485,14 @@ async def approve_survey_with_discount_start(
 
     await state.set_state(ModerationFSM.setting_discount)
     await state.update_data(survey_id=survey_id)
-    await callback.message.edit_text("Введите персональную скидку в процентах (0-100):")
+    await callback.message.edit_text(
+        "Введите персональную скидку в процентах (0-100).\n\n"
+        "Чтобы вернуться, нажмите «Назад».",
+        reply_markup=build_back_and_menu_inline_keyboard(
+            AdminAction.REVIEW_SURVEY_DETAIL,
+            survey_id=survey_id,
+        ),
+    )
     await callback.answer()
 
 
@@ -451,6 +500,15 @@ async def approve_survey_with_discount_start(
 async def approve_survey_with_discount_process(message: Message, state: FSMContext):
     data = await state.get_data()
     survey_id = data.get("survey_id")
+    if await _handle_state_back(
+        message,
+        state,
+        back_action=AdminAction.REVIEW_SURVEY_DETAIL,
+        survey_id=survey_id,
+        text="Возврат к анкете.",
+    ):
+        return
+
     if survey_id is None:
         await message.answer("Анкета не выбрана.")
         await state.clear()
@@ -1031,6 +1089,40 @@ async def edit_payment_confirmed_start(callback: CallbackQuery, state: FSMContex
     )
 
 
+@super_admin_router.callback_query(
+    AdminCallback.filter(F.action == AdminAction.EDIT_PAYMENT_BEFORE_BUTTON)
+)
+async def edit_payment_before_button_start(callback: CallbackQuery, state: FSMContext):
+    await _start_message_edit(
+        callback,
+        state,
+        BotMessageType.PAYMENT_BEFORE_BUTTON,
+        "Текущее сообщение перед кнопкой «Оплатить»",
+    )
+
+
+@super_admin_router.callback_query(
+    AdminCallback.filter(F.action == AdminAction.EDIT_PAYMENT_REQUEST_SENT)
+)
+async def edit_payment_request_sent_start(callback: CallbackQuery, state: FSMContext):
+    await _start_message_edit(
+        callback,
+        state,
+        BotMessageType.PAYMENT_REQUEST_SENT,
+        "Текущее сообщение после нажатия «Оплатить»",
+    )
+
+
+@super_admin_router.callback_query(AdminCallback.filter(F.action == AdminAction.EDIT_CHAT_RULES))
+async def edit_chat_rules_start(callback: CallbackQuery, state: FSMContext):
+    await _start_message_edit(
+        callback,
+        state,
+        BotMessageType.CHAT_RULES,
+        "Текущие правила чата",
+    )
+
+
 @super_admin_router.callback_query(AdminCallback.filter(F.action == AdminAction.EDIT_SURVEY_REJECTED))
 async def edit_survey_rejected_start(callback: CallbackQuery, state: FSMContext):
     await _start_message_edit(
@@ -1085,6 +1177,30 @@ async def edit_tariffs_header_start(callback: CallbackQuery, state: FSMContext):
         state,
         BotMessageType.TARIFFS_HEADER,
         "Текущий заголовок списка тарифов",
+    )
+
+
+@super_admin_router.callback_query(
+    AdminCallback.filter(F.action == AdminAction.EDIT_SUBSCRIPTION_EXPIRING_SOON)
+)
+async def edit_subscription_expiring_soon_start(callback: CallbackQuery, state: FSMContext):
+    await _start_message_edit(
+        callback,
+        state,
+        BotMessageType.SUBSCRIPTION_EXPIRING_SOON,
+        "Текущее сообщение «Подписка заканчивается»",
+    )
+
+
+@super_admin_router.callback_query(
+    AdminCallback.filter(F.action == AdminAction.EDIT_SUBSCRIPTION_EXPIRED)
+)
+async def edit_subscription_expired_start(callback: CallbackQuery, state: FSMContext):
+    await _start_message_edit(
+        callback,
+        state,
+        BotMessageType.SUBSCRIPTION_EXPIRED,
+        "Текущее сообщение «Подписка окончена»",
     )
 
 
